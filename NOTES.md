@@ -8,3 +8,4 @@
 - Motion pass: three.js shader backdrop (theme-coloured, lazy-loaded), Framer Motion for page/list/nav/toast animations, GSAP for the mascot, confetti and points counter. Theme switch moved to the top bar.
 
 ## Mon Oct 26 – Tue Oct 27 — The app itself (client): Today, Pokes, Rewards, Me, chat history, login and landing pages; calm mode, recurring reminders, @ instructions, undo, coins that the game costs and ignored pokes lose, poke scheduler with alarm and notifications, rain/fire/waves and rundown music on one volume, installable. Hardest part: the three.js background looked ten times stronger than its setting (colour management), so it is off.
+- Server and docs: /api/extract and /api/poke (Muse Spark; Muse Spark spent 798 of 800 tokens on reasoning, so limits are 2000 and 1000), /api/asr voice relay, passwordless device login with sync, render.yaml, and a README and DEMO.md for judges. Output from the model is checked server-side before the app trusts it.

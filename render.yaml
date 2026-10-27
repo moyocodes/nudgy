@@ -1,0 +1,25 @@
+# Render free web service: Express serves the built app and the /api routes.
+# Free instances sleep after ~15 min idle and have no persistent disk, so
+# server/data (accounts + synced data) is wiped on restart/redeploy; devices keep
+# their own copy and re-sync after logging in again.
+services:
+  - type: web
+    name: pokey
+    runtime: node
+    plan: free
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: node server/index.js
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: MODEL_API_KEY
+        sync: false
+      - key: MODEL_NAME
+        value: muse-spark-1.3
+      - key: VOICE_MODEL_NAME
+        value: muse-voice-transcribe-1.0
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
