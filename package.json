@@ -5,16 +5,22 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently -n server,web \"npm:dev:server\" \"npm:dev:web\"",
-    "dev:server": "node --env-file-if-exists=.env server/index.js",
+    "dev:server": "node --watch --env-file-if-exists=.env server/index.js",
     "dev:web": "vite",
     "build": "vite build"
   },
   "dependencies": {
+    "@react-three/fiber": "^9.8.2",
     "dotenv": "^18.0.9",
     "express": "^5.3.0",
+    "framer-motion": "^14.6.0",
+    "gsap": "^3.15.0",
     "openai": "^7.44.0",
     "react": "^19.3.1",
-    "react-dom": "^19.3.1"
+    "react-dom": "^19.3.1",
+    "react-router-dom": "^7.18.4",
+    "three": "^0.186.1",
+    "ws": "^8.22.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",

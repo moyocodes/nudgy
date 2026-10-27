@@ -1,0 +1,195 @@
+@import "tailwindcss";
+
+/* Semantic tokens. Each theme below sets the raw values; components only use these names. */
+@theme {
+  --font-display: var(--f-display);
+  --font-sans: var(--f-body);
+
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-line: var(--line);
+  --color-primary: var(--primary);
+  --color-primary-dark: var(--primary-dark);
+  --color-on-primary: var(--on-primary);
+  --color-accent: var(--accent);
+  --color-highlight: var(--highlight);
+  --color-soft: var(--soft);
+  --color-success: var(--success);
+
+  --radius-2xl: var(--r-inner);
+  --radius-3xl: var(--r-card);
+
+  --shadow-card: var(--card-shadow);
+  --shadow-btn: var(--btn-shadow);
+}
+
+/* Cheeky: brand cream, purple and pink. Soft chrome; the jokes live in the copy. */
+:root,
+[data-theme='cheeky'] {
+  --f-display: 'Geist', system-ui, sans-serif;
+  --f-body: 'Geist', system-ui, sans-serif;
+  --fw-display: 600;
+  --ls-display: -0.02em;
+
+  --bg: #faf6f0;
+  --surface: #ffffff;
+  --ink: #1b1726;
+  --line: rgb(27 23 38 / 0.08);
+  --primary: #5b4be8;
+  --primary-dark: #4637c9;
+  --on-primary: #ffffff;
+  --accent: #d6478a;
+  --highlight: #fcd34d;
+  --soft: #fbe3ee;
+  --success: #1f9d6b;
+
+  --r-inner: 0.875rem;
+  --r-card: 1.25rem;
+  --bw: 1px;
+  --card-shadow: 0 1px 2px rgb(27 23 38 / 0.04), 0 10px 30px -14px rgb(27 23 38 / 0.14);
+  --btn-shadow: none;
+
+  --mascot: #f9c5dd;
+  --mascot-line: #1b1726;
+  --mascot-face: #1b1726;
+  --bg-mix: 0.07;
+}
+
+/* Sassy: loud, blocky, hard shadows. Says it with its chest. */
+[data-theme='sassy'] {
+  --f-display: 'Inter', system-ui, sans-serif;
+  --f-body: 'Inter', system-ui, sans-serif;
+  --fw-display: 700;
+  --ls-display: -0.025em;
+
+  --bg: #f4f1ea;
+  --surface: #ffffff;
+  --ink: #111111;
+  --line: #111111;
+  --primary: #1f3bff;
+  --primary-dark: #111111;
+  --on-primary: #ffffff;
+  --accent: #ff4d2e;
+  --highlight: #ffe14d;
+  --soft: #e8e4da;
+  --success: #00b36b;
+
+  --r-inner: 0.5rem;
+  --r-card: 0.75rem;
+  --bw: 2px;
+  --card-shadow: 4px 4px 0 0 #111111;
+  --btn-shadow: 4px 4px 0 0 #111111;
+
+  --mascot: #ffe14d;
+  --mascot-line: #111111;
+  --mascot-face: #111111;
+  --bg-mix: 0.1;
+}
+
+/* Chill (default): calm greens, quiet confidence. */
+[data-theme='chill'] {
+  --f-display: 'DM Sans', system-ui, sans-serif;
+  --f-body: 'DM Sans', system-ui, sans-serif;
+  --fw-display: 600;
+  --ls-display: -0.02em;
+
+  --bg: #f3f6f4;
+  --surface: #ffffff;
+  --ink: #1e2b26;
+  --line: #e1e7e3;
+  --primary: #2f7d62;
+  --primary-dark: #22604a;
+  --on-primary: #ffffff;
+  --accent: #3b6ea8;
+  --highlight: #f2c14e;
+  --soft: #e1eee7;
+  --success: #2f9e6b;
+
+  --r-inner: 0.875rem;
+  --r-card: 1.25rem;
+  --bw: 1px;
+  --card-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
+  --btn-shadow: none;
+
+  --mascot: #9fd3b8;
+  --mascot-line: #2f7d62;
+  --mascot-face: #1e2b26;
+  --bg-mix: 0.07;
+}
+
+/* Night owl: dark, lime with amber, for late-night brain-dumps. */
+[data-theme='night'] {
+  --f-display: 'Space Grotesk', system-ui, sans-serif;
+  --f-body: 'Space Grotesk', system-ui, sans-serif;
+  --fw-display: 600;
+  --ls-display: -0.02em;
+
+  --bg: #0e1116;
+  --surface: #171b22;
+  --ink: #eef1f5;
+  --line: rgb(255 255 255 / 0.08);
+  --primary: #c6f432;
+  --primary-dark: #9cc41f;
+  --on-primary: #0e1116;
+  --accent: #8b7bff;
+  --highlight: #f2b84b;
+  --soft: #222936;
+  --success: #3ddc97;
+
+  --r-inner: 0.75rem;
+  --r-card: 1rem;
+  --bw: 1px;
+  --card-shadow: none;
+  --btn-shadow: 0 0 0 0 transparent;
+
+  --mascot: #c6f432;
+  --mascot-line: #0e1116;
+  --mascot-face: #0e1116;
+  --bg-mix: 0.12;
+}
+
+body {
+  @apply bg-bg text-ink font-sans antialiased;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.font-display {
+  font-weight: var(--fw-display);
+  letter-spacing: var(--ls-display);
+}
+/* One emphasised word per headline, e.g. "What's on your <em>mind</em>?" */
+.font-display em {
+  font-style: var(--display-em, normal);
+  color: var(--primary);
+}
+
+@keyframes wiggle {
+  0%, 100% { transform: rotate(-5deg); }
+  50% { transform: rotate(5deg); }
+}
+@keyframes poke {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(8px); }
+}
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 55%, transparent); }
+  100% { box-shadow: 0 0 0 22px transparent; }
+}
+@keyframes pop-in {
+  0% { opacity: 0; transform: scale(0.9) translateY(8px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes confetti-fall {
+  0% { transform: translateY(-20vh) rotate(0); opacity: 1; }
+  100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+}
+@keyframes story-fill {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+.pop-in { animation: pop-in 0.25s ease-out both; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}

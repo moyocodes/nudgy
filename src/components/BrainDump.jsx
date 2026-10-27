@@ -1,0 +1,242 @@
+import { useEffect, useRef, useState } from 'react'
+import { startTranscribing } from '../lib/museTranscribe.js'
+import { Button } from './ui.jsx'
+import { ArrowIcon, MicIcon } from './Icons.jsx'
+import { friendlyDue } from '../lib/format.js'
+import { getVolume } from '../lib/volume.js'
+
+const canRecord = typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia
+
+// Saying one of these at the end of a phrase sends the dump.
+const SEND_PHRASE = /\b(send it|send)[.!\s]*$/i
+
+const isPhone = () => window.matchMedia('(max-width: 639px)').matches
+
+// about: a reminder picked with @ (from here or a task card); the text is then instructions for it.
+// thinking: how many dumps Pokey is still working on; they run in the background.
+// Full screen: automatic when typing on a phone, or via the expand button anywhere.
+// question: Pokey's open question about a reminder; answer it here in plain words.
+export default function BrainDump({ onSubmit, reminders = [], about, onPickAbout, thinking = 0, question }) {
+  const [text, setText] = useState('')
+  const [interim, setInterim] = useState('')
+  const [listening, setListening] = useState(false)
+  const [micError, setMicError] = useState('')
+  const [focused, setFocused] = useState(false)
+  const [picking, setPicking] = useState(false)
+  const [full, setFull] = useState(false)
+  const expanded = focused || listening || !!text || !!about || full
+  const stopRef = useRef(null)
+  const textRef = useRef('')
+  const boxRef = useRef(null)
+  const inputRef = useRef(null)
+  textRef.current = text
+
+  useEffect(() => () => stopRef.current?.(), [])
+
+  // Full screen: lock the page behind it, and Esc closes it.
+  useEffect(() => {
+    if (!full) return
+    document.body.style.overflow = 'hidden'
+    const esc = (e) => e.key === 'Escape' && setFull(false)
+    window.addEventListener('keydown', esc)
+    return () => {
+      document.body.style.overflow = ''
+      window.removeEventListener('keydown', esc)
+    }
+  }, [full])
+
+  // Picking a reminder (here or from a card) brings the box into view, ready to type.
+  useEffect(() => {
+    if (!about) return
+    boxRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    inputRef.current?.focus({ preventScroll: true })
+  }, [about?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function stopMic() {
+    stopRef.current?.()
+    stopRef.current = null
+  }
+
+  function submit(value = textRef.current) {
+    const clean = value.trim()
+    if (!clean) return
+    stopMic()
+    onSubmit?.(clean)
+    setText('')
+    setInterim('')
+    setFull(false)
+  }
+
+  async function toggleMic() {
+    if (listening) return stopMic()
+    setMicError('')
+    try {
+      setListening(true)
+      stopRef.current = await startTranscribing({
+        onPartial: setInterim,
+        onFinal: (phrase) => {
+          setInterim('')
+          const joined = `${textRef.current} ${phrase}`.replace(/\s+/g, ' ').trimStart()
+          if (SEND_PHRASE.test(phrase)) submit(joined.replace(SEND_PHRASE, ''))
+          else setText(joined)
+        },
+        onError: setMicError,
+        onEnd: () => {
+          setListening(false)
+          setInterim('')
+        },
+      })
+    } catch (e) {
+      setListening(false)
+      setMicError(e.name === 'NotAllowedError' ? 'Mic access was blocked.' : e.message)
+    }
+  }
+
+  return (
+    <>
+    <section
+      ref={boxRef}
+      className={
+        full
+          ? 'fixed inset-0 z-[60] flex flex-col bg-surface p-4 pt-3'
+          : 'relative rounded-3xl bg-surface p-3 shadow-card border-[length:var(--bw)] border-line focus-within:border-primary/40'
+      }
+    >
+      <label htmlFor="dump" className="sr-only">
+        Dump everything on your mind
+      </label>
+      <div className={`flex items-center justify-between ${full ? 'mb-2' : 'absolute right-2 top-2'}`}>
+        {full && <span className="font-display text-xl">Brain dump</span>}
+        <button
+          type="button"
+          onClick={() => { setFull((f) => !f); inputRef.current?.focus({ preventScroll: true }) }}
+          aria-label={full ? 'Close full screen' : 'Open full screen'}
+          title={full ? 'Close (Esc)' : 'Full screen'}
+          className="grid h-8 w-8 place-items-center rounded-full text-ink/40 hover:bg-ink/5 hover:text-ink"
+        >
+          {full ? '×' : '⤢'}
+        </button>
+      </div>
+      {question && !about && (
+        <p className="mb-1 flex items-start gap-2 rounded-2xl rounded-bl-md bg-soft px-3 py-2 pr-9 text-sm leading-snug">
+          <span className="shrink-0 font-semibold text-primary">Pokey:</span>
+          <span className="flex-1">{question}</span>
+          {/* Read the question aloud with the device's own voice (no model call). */}
+          {'speechSynthesis' in window && (
+            <button
+              type="button"
+              onClick={() => {
+                window.speechSynthesis.cancel()
+                const line = new SpeechSynthesisUtterance(question)
+                line.rate = 1.05
+                line.pitch = 1.25
+                line.volume = getVolume()
+                window.speechSynthesis.speak(line)
+              }}
+              aria-label="Hear Pokey's question"
+              title="Hear it"
+              className="-my-1 shrink-0 rounded-full px-1.5 py-1 text-ink/50 hover:bg-ink/5 hover:text-ink"
+            >
+              🔊
+            </button>
+          )}
+        </p>
+      )}
+      {about && (
+        <div className="mb-1 flex items-center gap-2 px-1">
+          <span className="inline-flex min-w-0 items-center gap-1.5 rounded-full bg-soft px-3 py-1 text-sm font-medium">
+            <span className="text-primary">@</span>
+            <span className="truncate">{about.title}</span>
+          </span>
+          <button type="button" onClick={() => onPickAbout(null)} aria-label="Stop talking about this reminder" className="text-sm text-ink/40 hover:text-ink">×</button>
+        </div>
+      )}
+      <textarea
+        ref={inputRef}
+        id="dump"
+        value={interim ? `${text} ${interim}`.trimStart() : text}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => {
+          // Enter sends, Shift+Enter is a new line. Leave it alone mid-IME composition.
+          if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+            e.preventDefault()
+            submit()
+          }
+        }}
+        readOnly={!!interim}
+        rows={expanded ? 3 : 1}
+        onFocus={() => { setFocused(true); if (isPhone()) setFull(true) }}
+        onBlur={() => setFocused(false)}
+        placeholder={
+          about
+            ? 'What should I do with it? "7pm", "every Monday", "high priority", "done"…'
+            : question ? 'Answer Pokey, or add something new…'
+            : expanded ? "Call the dentist, buy oat milk… or just tell me you're swamped." : 'Add something, or brain-dump it all…'
+        }
+        className={`w-full resize-none bg-transparent p-2 leading-relaxed outline-none placeholder:text-ink/35 ${full ? 'flex-1 text-lg' : 'pr-9 text-base'}`}
+      />
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={toggleMic}
+          disabled={!canRecord}
+          aria-pressed={listening}
+          aria-label={listening ? 'Stop listening' : 'Start speaking'}
+          className={`grid h-10 w-10 shrink-0 place-items-center rounded-full transition disabled:opacity-40 ${
+            listening ? 'bg-primary text-on-primary' : 'bg-ink/5 text-ink/70 hover:bg-ink/10'
+          }`}
+          style={listening ? { animation: 'pulse-ring 1.2s infinite' } : undefined}
+        >
+          <MicIcon size={18} />
+        </button>
+        {reminders.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setPicking((p) => !p)}
+            aria-expanded={picking}
+            aria-label="Pick a reminder to talk about"
+            title="Pick a reminder to talk about"
+            className={`grid h-10 w-10 shrink-0 place-items-center rounded-full text-base font-semibold transition ${picking ? 'bg-primary text-on-primary' : 'bg-ink/5 text-ink/70 hover:bg-ink/10'}`}
+          >
+            @
+          </button>
+        )}
+        <p className="min-w-0 flex-1 text-[13px] leading-tight text-ink/50">
+          {micError
+            ? micError
+            : !canRecord
+              ? "Your browser can't record. Type instead."
+              : listening
+                ? 'Listening… say "send" when you\'re done.'
+                : 'Talk or type. Enter sends.'}
+        </p>
+        <Button size="sm" onClick={() => submit()} disabled={!text.trim()}>
+          {about ? 'Tell Pokey' : 'Add tasks'} <ArrowIcon size={16} />
+        </Button>
+      </div>
+      {picking && (
+        <ul className="mt-2 max-h-56 overflow-y-auto rounded-2xl border-[length:var(--bw)] border-line bg-bg p-1" aria-label="Your reminders">
+          {reminders.map((t) => (
+            <li key={t.id}>
+              <button
+                type="button"
+                onClick={() => { onPickAbout(t.id); setPicking(false) }}
+                className="flex w-full items-baseline justify-between gap-3 rounded-xl px-3 py-2 text-left text-sm hover:bg-ink/5"
+              >
+                <span className="min-w-0 truncate">{t.title}</span>
+                <span className="shrink-0 text-xs text-ink/45">{t.due ? friendlyDue(t.due) : 'No date'}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+    {thinking > 0 && (
+      <p role="status" className="-mt-2 flex items-center gap-2 px-2 text-xs text-ink/50">
+        <span className="h-2 w-2 animate-pulse rounded-full bg-primary" />
+        Pokey's on it{thinking > 1 ? ` (${thinking})` : ''}… carry on, I'll shout when it's sorted.
+      </p>
+    )}
+    </>
+  )
+}
