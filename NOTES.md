@@ -11,3 +11,4 @@
 - Server and docs: /api/extract and /api/poke (Muse Spark; Muse Spark spent 798 of 800 tokens on reasoning, so limits are 2000 and 1000), /api/asr voice relay, passwordless device login with sync, render.yaml, and a README and DEMO.md for judges. Output from the model is checked server-side before the app trusts it.
 - Photo proof with SAM 3.1: the server uploads the photo and asks SAM 3.1 to find the task's object (e.g. "oat milk" from "Buy oat milk"); the client shrinks the photo to a small JPEG first and the same photo is never checked twice.
 - Personal badge art with Muse Image: one picture per earned badge, made only when the user taps "Create my badge", in their theme colours and based on what they actually did. An optional script makes a default set.
+- Account menu: shows you're signed in and opens a small menu with Today, Me and Log out.
