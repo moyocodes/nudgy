@@ -7,7 +7,7 @@ if (typeof window !== 'undefined') {
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault()
     deferred = e
-    window.dispatchEvent(new Event('pokey:installable'))
+    window.dispatchEvent(new Event('nudgy:installable'))
   })
 }
 
@@ -20,8 +20,8 @@ export default function InstallButton({ className = '' }) {
 
   useEffect(() => {
     const on = () => setCanInstall(true)
-    window.addEventListener('pokey:installable', on)
-    return () => window.removeEventListener('pokey:installable', on)
+    window.addEventListener('nudgy:installable', on)
+    return () => window.removeEventListener('nudgy:installable', on)
   }, [])
 
   if (installed()) return null
@@ -38,7 +38,7 @@ export default function InstallButton({ className = '' }) {
         }}
         className={`min-h-10 rounded-full bg-primary px-4 text-sm font-semibold text-on-primary shadow-btn ${className}`}
       >
-        Add Pokey to your home screen
+        Add Nudgy to your home screen
       </button>
     )
   }
@@ -47,7 +47,7 @@ export default function InstallButton({ className = '' }) {
     return (
       <div className={className}>
         <button type="button" onClick={() => setShowSteps((s) => !s)} className="min-h-10 rounded-full bg-primary px-4 text-sm font-semibold text-on-primary shadow-btn">
-          Add Pokey to your home screen
+          Add Nudgy to your home screen
         </button>
         {showSteps && (
           <p className="mt-2 text-sm text-ink/60">Tap <strong>Share</strong> (the square with the arrow) at the bottom of Safari, then <strong>Add to Home Screen</strong>.</p>

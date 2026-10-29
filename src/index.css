@@ -54,6 +54,7 @@
   --mascot-line: #1b1726;
   --mascot-face: #1b1726;
   --bg-mix: 0.07;
+  --hero-glow: 0.38;
 }
 
 /* Sassy: loud, blocky, hard shadows. Says it with its chest. */
@@ -85,6 +86,7 @@
   --mascot-line: #111111;
   --mascot-face: #111111;
   --bg-mix: 0.1;
+  --hero-glow: 0.34;
 }
 
 /* Chill (default): calm greens, quiet confidence. */
@@ -116,6 +118,7 @@
   --mascot-line: #2f7d62;
   --mascot-face: #1e2b26;
   --bg-mix: 0.07;
+  --hero-glow: 0.30;
 }
 
 /* Night owl: dark, lime with amber, for late-night brain-dumps. */
@@ -147,6 +150,7 @@
   --mascot-line: #0e1116;
   --mascot-face: #0e1116;
   --bg-mix: 0.12;
+  --hero-glow: 0.15;
 }
 
 body {
@@ -168,7 +172,7 @@ body {
   0%, 100% { transform: rotate(-5deg); }
   50% { transform: rotate(5deg); }
 }
-@keyframes poke {
+@keyframes nudge {
   0%, 100% { transform: translateX(0); }
   50% { transform: translateX(8px); }
 }

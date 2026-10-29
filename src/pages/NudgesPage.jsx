@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import { useStore } from '../lib/store.jsx'
-import { MAX_LEVEL, makePoke } from '../lib/pokes.js'
-import PokeBubble from '../components/PokeBubble.jsx'
+import { MAX_LEVEL, makeNudge } from '../lib/nudges.js'
+import NudgeBubble from '../components/NudgeBubble.jsx'
 import { Button } from '../components/ui.jsx'
 import { BellIcon } from '../components/Icons.jsx'
 
@@ -17,8 +17,8 @@ function NotifyCard() {
       <BellIcon size={18} className="shrink-0 text-primary" />
       <p className="min-w-0 flex-1 text-sm leading-snug">
         {permission === 'denied'
-          ? "Notifications are blocked. Unblock them in your browser's site settings and I can poke you from other tabs."
-          : 'Let me poke you even when you’re in another tab?'}
+          ? "Notifications are blocked. Unblock them in your browser's site settings and I can nudge you from other tabs."
+          : 'Let me nudge you even when you’re in another tab?'}
       </p>
       {permission === 'default' && (
         <button
@@ -33,49 +33,49 @@ function NotifyCard() {
   )
 }
 
-export default function PokesPage() {
-  const { name, tasks, pokes, setPokes, completeTask, snoozeTask } = useStore()
-  const [poking, setPoking] = useState(false)
+export default function NudgesPage() {
+  const { name, buddyName, tasks, nudges, setNudges, completeTask, snoozeTask } = useStore()
+  const [nudging, setNudging] = useState(false)
 
-  // Pokes the most important open task right now, with a model-written line.
-  async function pokeMeNow() {
+  // Nudges the most important open task right now, with a model-written line.
+  async function nudgeMeNow() {
     const open = tasks.filter((t) => !t.done)
-    if (!open.length || poking) return
+    if (!open.length || nudging) return
     const rank = { high: 0, medium: 1, low: 2 }
     const task = [...open].sort((a, b) => rank[a.priority] - rank[b.priority])[0]
-    const level = Math.min(MAX_LEVEL, pokes.filter((p) => p.taskId === task.id).length + 1)
-    setPoking(true)
-    const poke = await makePoke(task, level, name)
-    setPokes((ps) => [...ps, poke])
-    setPoking(false)
+    const level = Math.min(MAX_LEVEL, nudges.filter((p) => p.taskId === task.id).length + 1)
+    setNudging(true)
+    const nudge = await makeNudge(task, level, name, 0, buddyName)
+    setNudges((ps) => [...ps, nudge])
+    setNudging(false)
   }
 
-  // Only the newest poke for each task gets Done/Snooze, so repeats don't stack buttons.
-  const latest = new Set(Object.values(Object.fromEntries(pokes.map((p) => [p.taskId, p.id]))))
+  // Only the newest nudge for each task gets Done/Snooze, so repeats don't stack buttons.
+  const latest = new Set(Object.values(Object.fromEntries(nudges.map((p) => [p.taskId, p.id]))))
 
   return (
     <div className="flex flex-col gap-4 pt-2">
       <header className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="font-display text-[1.75rem] leading-tight">Pokes</h1>
+          <h1 className="font-display text-[1.75rem] leading-tight">Nudges</h1>
           <p className="text-sm text-ink/50">Everything I've nudged you about.</p>
         </div>
-        <Button size="sm" variant="ghost" onClick={pokeMeNow} disabled={poking} className="shrink-0 px-3.5">
-          <BellIcon size={15} /> {poking ? 'Winding up…' : 'Poke me'}
+        <Button size="sm" variant="ghost" onClick={nudgeMeNow} disabled={nudging} className="shrink-0 px-3.5">
+          <BellIcon size={15} /> {nudging ? 'Winding up…' : 'Nudge me'}
         </Button>
       </header>
       <NotifyCard />
-      {pokes.length === 0 ? (
-        <p className="py-8 text-center text-ink/50">No pokes. Enjoy the peace while it lasts.</p>
+      {nudges.length === 0 ? (
+        <p className="py-8 text-center text-ink/50">No nudges. Enjoy the peace while it lasts.</p>
       ) : (
         <ul className="flex flex-col-reverse gap-2">
           <AnimatePresence initial={false}>
-          {pokes.map((p) => {
+          {nudges.map((p) => {
             const task = tasks.find((t) => t.id === p.taskId)
             return (
               <li key={p.id}>
-                <PokeBubble
-                  poke={p}
+                <NudgeBubble
+                  nudge={p}
                   task={task}
                   onDone={latest.has(p.id) ? () => completeTask(p.taskId) : undefined}
                   onSnooze={latest.has(p.id) ? () => snoozeTask(p.taskId) : undefined}

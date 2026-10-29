@@ -8,10 +8,11 @@ export function friendlyDue(iso) {
   if (d < now) return `Overdue · ${diff === 0 ? time : `${-diff}d ago`}`
   if (diff === 0) return `Today, ${time}`
   if (diff === 1) return `Tomorrow, ${time}`
-  return `${d.toLocaleDateString([], { weekday: 'long' })}, ${time}`
+  // Weekday plus date ('Wed, Nov 4'), so a wrong day can be spotted and 'Wednesday' can't mean two different weeks.
+  return `${d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}, ${time}`
 }
 
-// What actually got saved, in words. Built from the real tasks so Pokey never claims a reminder it didn't set.
+// What actually got saved, in words. Built from the real tasks so Nudgy never claims a reminder it didn't set.
 export function savedSummary(tasks) {
   if (!tasks.length) return ''
   const one = (t) => `"${t.title}" ${t.due ? friendlyDue(t.due).toLowerCase() : '(no time yet)'}`
@@ -38,7 +39,7 @@ export function nextDue(tasks, now = Date.now()) {
     .sort((a, b) => new Date(a.due) - new Date(b.due))[0]
 }
 
-// Not due yet: finishing or binning it now earns a "sure?" from Pokey.
+// Not due yet: finishing or binning it now earns a "sure?" from Nudgy.
 export function isEarly(task) {
   return !task.done && task.due && new Date(task.due) > new Date()
 }

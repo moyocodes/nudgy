@@ -1,9 +1,9 @@
-// When Pokey is allowed to poke. Plain functions with no browser APIs, so the poke agent
+// When Nudgy is allowed to nudge. Plain functions with no browser APIs, so the nudge agent
 // on the server can import the same rules later.
 //
 // settings = { sleepStart: '23:00', sleepEnd: '07:00', checkIn: '10:00' }
 // - Undated tasks get nudged once a day at checkIn.
-// - During sleep hours only medium and high priority tasks may poke; low waits until sleepEnd.
+// - During sleep hours only medium and high priority tasks may nudge; low waits until sleepEnd.
 
 export const DEFAULT_SCHEDULE = { sleepStart: '23:00', sleepEnd: '07:00', checkIn: '10:00' }
 
@@ -20,7 +20,7 @@ export function isAsleep(date, { sleepStart, sleepEnd }) {
   return start <= end ? now >= start && now < end : now >= start || now < end
 }
 
-export function canPoke(task, date, schedule) {
+export function canNudge(task, date, schedule) {
   if (task.done) return false
   return task.priority !== 'low' || !isAsleep(date, schedule)
 }
@@ -32,9 +32,9 @@ function at(date, hhmm) {
   return d
 }
 
-// The next moment this task would poke: its due time (or the next check-in if undated),
+// The next moment this task would nudge: its due time (or the next check-in if undated),
 // pushed to wake-up time when it lands in sleep hours and the task is low priority.
-export function nextPokeTime(task, schedule, now = new Date()) {
+export function nextNudgeTime(task, schedule, now = new Date()) {
   if (task.done) return null
   let when
   if (task.due) {
@@ -44,7 +44,7 @@ export function nextPokeTime(task, schedule, now = new Date()) {
     when = at(now, schedule.checkIn)
     if (when <= now) when.setDate(when.getDate() + 1)
   }
-  if (!canPoke(task, when, schedule)) {
+  if (!canNudge(task, when, schedule)) {
     const wake = at(when, schedule.sleepEnd)
     if (wake <= when) wake.setDate(wake.getDate() + 1)
     when = wake

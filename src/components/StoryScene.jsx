@@ -3,8 +3,8 @@ import gsap from 'gsap'
 import { useStore } from '../lib/store.jsx'
 import { BellIcon, CameraIcon, CheckIcon, MicIcon, PencilIcon, TrophyIcon } from './Icons.jsx'
 
-// Little scenes that act out Pokey's core loop behind story slides:
-// dump -> tasks -> edit -> poke -> proof -> badge. Built from the app's own UI pieces and
+// Little scenes that act out Nudgy's core loop behind story slides:
+// dump -> tasks -> edit -> nudge -> proof -> badge. Built from the app's own UI pieces and
 // coloured by the active theme. In the tutorial they're interactive: the scene plays up to
 // "ready", waits for the user to tap the highlighted thing, then plays on to "end".
 // In the daily rundown they just loop.
@@ -117,17 +117,17 @@ function Edit({ act, hint }) {
   )
 }
 
-function Poke({ name, act, hint }) {
+function Nudge({ name, act, hint }) {
   const t = target(act, hint, 'Snooze it')
   return (
     <div className="relative flex h-full flex-col items-center gap-2.5 pt-1">
       <span className="s-bell grid h-11 w-11 place-items-center rounded-full bg-soft text-primary"><BellIcon size={20} /></span>
-      <div className={`s-poke1 ${row} w-full`}>
+      <div className={`s-nudge1 ${row} w-full`}>
         <span className="min-w-0 flex-1 text-[13px] leading-snug">{name}, Yinka's in an hour. Shoes on?</span>
         <span {...t} className={`shrink-0 rounded-full border-[length:var(--bw)] border-line px-2.5 py-1 text-[11px] font-semibold text-ink/70 ${t.className ?? ''}`}>Snooze</span>
       </div>
-      <div className="s-poke2 flex w-full items-center rounded-xl bg-primary px-3 py-2.5 text-on-primary shadow-card">
-        <span className="text-[13px] font-semibold leading-snug">Snoozed? Bold. {name.toUpperCase()}. Yinka's. Now.</span>
+      <div className="s-nudge2 flex w-full items-center rounded-xl bg-primary px-3 py-2.5 text-on-primary shadow-card">
+        <span className="text-[13px] font-semibold leading-snug">Snoozed? Noted. {name.toUpperCase()}. Yinka's. Now.</span>
       </div>
     </div>
   )
@@ -228,18 +228,18 @@ const TIMELINES = {
       .addLabel('end')
       .to('.s-pencil', { opacity: 0, duration: 0.3 }, '+=0.6')
   },
-  poke(tl) {
-    tl.set('.s-poke1, .s-poke2', { opacity: 0, y: -14, scale: 0.97 })
+  nudge(tl) {
+    tl.set('.s-nudge1, .s-nudge2', { opacity: 0, y: -14, scale: 0.97 })
       .to('.s-bell', { rotation: 16, duration: 0.07, yoyo: true, repeat: 7, ease: 'sine.inOut', transformOrigin: '50% 10%', delay: 0.3 })
       .set('.s-bell', { rotation: 0 })
-      .to('.s-poke1', { opacity: 1, y: 0, scale: 1, duration: 0.45, ease: 'power3.out' }, '-=0.2')
+      .to('.s-nudge1', { opacity: 1, y: 0, scale: 1, duration: 0.45, ease: 'power3.out' }, '-=0.2')
       .addLabel('ready')
-      .to('.s-poke1', { opacity: 0.45, duration: 0.25 }, '+=0.3')
+      .to('.s-nudge1', { opacity: 0.45, duration: 0.25 }, '+=0.3')
       .to('.s-bell', { rotation: 22, duration: 0.06, yoyo: true, repeat: 11, ease: 'sine.inOut' }, '+=0.3')
       .set('.s-bell', { rotation: 0 })
-      .to('.s-poke2', { opacity: 1, y: 0, scale: 1, duration: 0.4, ease: 'back.out(1.8)' }, '-=0.25')
+      .to('.s-nudge2', { opacity: 1, y: 0, scale: 1, duration: 0.4, ease: 'back.out(1.8)' }, '-=0.25')
       .addLabel('end')
-      .to('.s-poke1, .s-poke2', { opacity: 0, duration: 0.3, delay: 1.2 })
+      .to('.s-nudge1, .s-nudge2', { opacity: 0, duration: 0.3, delay: 1.2 })
   },
   proof(tl) {
     tl.set('.s-flash', { opacity: 0 })
@@ -276,7 +276,7 @@ const TIMELINES = {
   },
 }
 
-const SCENES = { dump: Dump, tasks: Tasks, edit: Edit, poke: Poke, proof: Proof, badge: Badge }
+const SCENES = { dump: Dump, tasks: Tasks, edit: Edit, nudge: Nudge, proof: Proof, badge: Badge }
 
 export default function StoryScene({ scene, data, paused, interactive = false, onDone }) {
   const { name } = useStore()

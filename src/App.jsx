@@ -9,12 +9,12 @@ import Tutorial from './components/Tutorial.jsx'
 import Intro from './components/Intro.jsx'
 import Joke from './components/Joke.jsx'
 import Buddy from './components/Buddy.jsx'
-import PokeScheduler from './components/PokeScheduler.jsx'
+import NudgeScheduler from './components/NudgeScheduler.jsx'
 import Permissions from './components/Permissions.jsx'
 import AmbientPlayer from './components/AmbientPlayer.jsx'
 import OnboardingPage from './pages/OnboardingPage.jsx'
 import HomePage from './pages/HomePage.jsx'
-import PokesPage from './pages/PokesPage.jsx'
+import NudgesPage from './pages/NudgesPage.jsx'
 import ProofPage from './pages/ProofPage.jsx'
 import RewardsPage from './pages/RewardsPage.jsx'
 import SettingsPage from './pages/SettingsPage.jsx'
@@ -37,12 +37,16 @@ function Page({ children }) {
 }
 
 export default function App() {
-  const { name, introSeen, setIntroSeen } = useStore()
+  const { name, account, introSeen, setIntroSeen } = useStore()
   const location = useLocation()
-  // Welcome and login are the two screens you can see before Pokey knows your name.
+  // Welcome and login are the only pages open to everyone.
   const onboarding = location.pathname === '/welcome' || location.pathname === '/login'
 
-  if (!name && !onboarding) return <Navigate to="/welcome" replace />
+  // Everything else needs an account. Logged out: welcome. Logged in but no name yet: the name step on /login.
+  if (!account && !onboarding) return <Navigate to="/welcome" replace />
+  if (account && !name && !onboarding) return <Navigate to="/login" replace />
+  // Already in: the welcome page isn't for you.
+  if (account && name && location.pathname === '/welcome') return <Navigate to="/" replace />
 
   return (
     <>
@@ -59,7 +63,7 @@ export default function App() {
             <Route path="/welcome" element={<Page><OnboardingPage /></Page>} />
             <Route path="/login" element={<Page><LoginPage /></Page>} />
             <Route path="/" element={<Page><HomePage /></Page>} />
-            <Route path="/pokes" element={<Page><PokesPage /></Page>} />
+            <Route path="/nudges" element={<Page><NudgesPage /></Page>} />
             <Route path="/proof/:id" element={<Page><ProofPage /></Page>} />
             <Route path="/rewards" element={<Page><RewardsPage /></Page>} />
             <Route path="/settings" element={<Page><SettingsPage /></Page>} />
@@ -71,7 +75,7 @@ export default function App() {
       </main>
 
       {!onboarding && <Nav />}
-      {!onboarding && <PokeScheduler />}
+      {!onboarding && <NudgeScheduler />}
       <AmbientPlayer />
       <Celebration />
       <Tutorial />

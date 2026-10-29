@@ -3,9 +3,11 @@ import gsap from 'gsap'
 import Mascot from './Mascot.jsx'
 
 const MESSY = "ugh ok. dentist?? oat milk. also yinka's tmrw like 5pm"
+// What Nudgy makes of it: one tidy reminder per part of the messy line, same as the how-to slides.
+const TIDY = [['Call the dentist', 'Today, 2:00 PM'], ['Buy oat milk', 'Today, 6:00 PM'], ["Go to Yinka's place", 'Tomorrow, 5:00 PM']]
 
 // Welcome intro, once per visit: a messy thought types itself out, falls apart, and snaps into a
-// tidy task card that Pokey pokes. A Skip button counts down the seconds left; any key or tap skips too.
+// tidy task card that Nudgy nudges. A Skip button counts down the seconds left; any key or tap skips too.
 export default function Intro({ onDone }) {
   const root = useRef(null)
   const done = useRef(onDone)
@@ -26,12 +28,13 @@ export default function Intro({ onDone }) {
         },
       })
       if (reduced) {
-        tl.set('.i-char', { opacity: 0 }).set('.i-card, .i-poke, .i-tag', { opacity: 1 }).to({}, { duration: 2.5 })
+        tl.set('.i-char', { opacity: 0 }).set('.i-card, .i-nudge, .i-tag', { opacity: 1 }).to({}, { duration: 2.5 })
         return
       }
       tl.set('.i-card', { opacity: 0, scale: 0.9, y: 16 })
-        .set('.i-poke', { opacity: 0 })
+        .set('.i-nudge', { opacity: 0 })
         .set('.i-tag', { opacity: 0, y: 8 })
+        .from('.i-hero', { opacity: 0, scale: 0.6, y: 20, duration: 0.5, ease: 'back.out(2)' })
         .from('.i-char', { opacity: 0, duration: 0.01, stagger: 0.035 })
         .to('.i-line', { x: 3, duration: 0.05, yoyo: true, repeat: 5 }, '+=0.35')
         .to('.i-char', {
@@ -44,9 +47,9 @@ export default function Intro({ onDone }) {
           ease: 'power2.in',
           stagger: { each: 0.008, from: 'random' },
         }, '+=0.15')
-        .to('.i-card', { opacity: 1, scale: 1, y: 0, duration: 0.6, ease: 'back.out(1.7)' }, '-=0.15')
-        .to('.i-poke', { opacity: 1, duration: 0.3 }, '-=0.2')
-        .to('.i-card', { x: 6, duration: 0.08, yoyo: true, repeat: 1 }, '+=0.25')
+        .to('.i-card', { opacity: 1, scale: 1, y: 0, duration: 0.5, ease: 'back.out(1.7)', stagger: 0.2 }, '-=0.15')
+        .to('.i-nudge', { opacity: 1, duration: 0.3 }, '-=0.2')
+        .to('.i-last', { x: 6, duration: 0.08, yoyo: true, repeat: 1 }, '+=0.25')
         .to('.i-tag', { opacity: 1, y: 0, duration: 0.5, ease: 'power3.out' }, '+=0.1')
         .to({}, { duration: 1.6 })
         .to(root.current, { opacity: 0, duration: 0.35 })
@@ -67,12 +70,17 @@ export default function Intro({ onDone }) {
     <div
       ref={root}
       role="dialog"
-      aria-label="Welcome to Pokey"
+      aria-label="Welcome to Nudgy"
       onPointerDown={() => done.current?.()}
       className="fixed inset-0 z-[80] flex cursor-pointer flex-col items-center justify-center gap-8 bg-bg px-6"
     >
+      <div className="i-hero flex flex-col items-center gap-1">
+        <Mascot size={104} wiggle />
+        <p className="font-display text-3xl text-primary">Nudgy</p>
+      </div>
+
       {/* The messy line and the tidy card share one spot, so the card appears where the words fell apart. */}
-      <div className="relative grid h-40 w-full max-w-sm place-items-center">
+      <div className="relative grid h-56 w-full max-w-sm place-items-center">
         <p className="i-line absolute inset-x-0 text-center font-mono text-lg leading-relaxed text-ink/70" aria-label={MESSY}>
           {[...MESSY].map((c, i) => (
             <span key={i} className="i-char inline-block whitespace-pre" aria-hidden>{c}</span>
@@ -80,13 +88,17 @@ export default function Intro({ onDone }) {
         </p>
 
         <div className="relative flex items-end gap-2">
-          <span className="i-poke opacity-0"><Mascot size={56} poking /></span>
-        <div className="i-card flex opacity-0 w-64 items-center gap-3 rounded-2xl border-[length:var(--bw)] border-line bg-surface px-4 py-3 shadow-card">
-          <span className="h-5 w-5 shrink-0 rounded-full border-[1.5px] border-ink/25" />
-          <span className="min-w-0">
-            <span className="block text-[15px] font-medium">Go to Yinka's place</span>
-            <span className="block text-[13px] text-ink/50">Tomorrow, 5:00 PM</span>
-          </span>
+          <span className="i-nudge opacity-0"><Mascot size={56} nudging /></span>
+          <div className="flex flex-col gap-2">
+            {TIDY.map(([title, when], i) => (
+              <div key={title} className={`${i === TIDY.length - 1 ? 'i-last ' : ''}i-card flex w-64 items-center gap-3 rounded-2xl border-[length:var(--bw)] border-line bg-surface px-4 py-2.5 opacity-0 shadow-card`}>
+                <span className="h-5 w-5 shrink-0 rounded-full border-[1.5px] border-ink/25" />
+                <span className="min-w-0">
+                  <span className="block text-[15px] font-medium">{title}</span>
+                  <span className="block text-[13px] text-ink/50">{when}</span>
+                </span>
+              </div>
+            ))}
           </div>
         </div>
       </div>

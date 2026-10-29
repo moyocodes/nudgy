@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
+import { useNavigate } from 'react-router-dom'
 import { useStore } from '../lib/store.jsx'
 import { friendlyDue, isEarly, isOverdue } from '../lib/format.js'
 import { badgeStats, nextBadge } from '../lib/mockData.js'
@@ -7,7 +8,7 @@ import Mascot from './Mascot.jsx'
 import StoryScene from './StoryScene.jsx'
 import { resumeMusic, startMusic, stopMusic } from '../lib/music.js'
 import { AMBIENT_SOUNDS, resumeAmbient } from '../lib/ambient.js'
-import { CheckIcon } from './Icons.jsx'
+import { CameraIcon, CheckIcon } from './Icons.jsx'
 
 const SLIDE_MS = 5000
 
@@ -54,13 +55,14 @@ function buildSlides(name, tasks, streak) {
     const left = next.goal - stats[next.stat]
     slides.push({ kind: 'badge', eyebrow: 'Next badge', title: next.label, body: `${left} more to go.`, progress: stats[next.stat] / next.goal })
   }
-  slides.push({ kind: 'end', title: "That's the lot.", body: "I'll poke you if anything slips." })
+  slides.push({ kind: 'end', title: "That's the lot.", body: "I'll nudge you if anything slips." })
   return slides
 }
 
 // Plays the daily rundown by default; pass `slides` to reuse it for something else, like the tutorial.
 export default function Story({ onClose, slides: custom, title = "Today's rundown", endLabel = 'Open my list' }) {
-  const { name, tasks, streak, completeTask, setStoryOpen, musicOn, setMusicOn, ambient, setAmbient } = useStore()
+  const navigate = useNavigate()
+  const { name, tasks, streak, completeTask, setStoryOpen, musicOn, setMusicOn, ambient, setAmbient, muted, setMuted } = useStore()
   useEffect(() => {
     setStoryOpen(true)
     return () => setStoryOpen(false)
@@ -68,14 +70,17 @@ export default function Story({ onClose, slides: custom, title = "Today's rundow
 
   // Background music for the daily rundown only (not the tutorial), stopped when it closes.
   // A rain/fire/waves background sound replaces it, and keeps playing after the rundown.
-  const withMusic = !custom && musicOn && !ambient
+  const withMusic = !custom && musicOn && !ambient && !muted
   const SOUNDS = [['music', '🎵', 'Music'], ...AMBIENT_SOUNDS, ['off', '🔇', 'Sound off']]
-  const current = ambient ?? (musicOn ? 'music' : 'off')
+  const current = muted ? 'off' : ambient ?? (musicOn ? 'music' : 'off')
   const currentSound = SOUNDS.find(([id]) => id === current) ?? SOUNDS[0]
   function nextSound() {
     const [id] = SOUNDS[(SOUNDS.findIndex(([s]) => s === current) + 1) % SOUNDS.length]
+    // "Sound off" is the master mute: it silences everything, including nudges. Any other choice turns sound back on.
+    if (id === 'off') return setMuted(true)
+    setMuted(false)
     setMusicOn(id === 'music')
-    setAmbient(id === 'music' || id === 'off' ? null : id)
+    setAmbient(id === 'music' ? null : id)
   }
   useEffect(() => {
     if (!withMusic) return
@@ -129,6 +134,11 @@ export default function Story({ onClose, slides: custom, title = "Today's rundow
 
   // Ticking off something that isn't due yet asks first (see `confirming`).
   function tickOff(task, sure = false) {
+    // Photo-proof tasks can't be ticked off here; off to the camera.
+    if (task.physical) {
+      onClose()
+      return navigate(`/proof/${task.id}`)
+    }
     if (!sure && isEarly(task)) return setConfirming(task.id)
     setConfirming(null)
     completeTask(task.id)
@@ -279,7 +289,7 @@ export default function Story({ onClose, slides: custom, title = "Today's rundow
                 disabled={ticked[slide.task.id]}
                 className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-full bg-primary text-sm font-semibold text-on-primary disabled:bg-success"
               >
-                <CheckIcon size={16} /> {ticked[slide.task.id] ? 'Done' : 'Already done'}
+                {slide.task.physical ? <><CameraIcon size={16} /> Snap proof +15</> : <><CheckIcon size={16} /> {ticked[slide.task.id] ? 'Done' : 'Already done'}</>}
               </button>
               <button type="button" onClick={() => go(1)} className="min-h-11 flex-1 rounded-full border-[length:var(--bw)] border-line bg-surface text-sm font-semibold">
                 On it later

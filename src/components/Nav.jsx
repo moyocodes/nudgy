@@ -6,7 +6,7 @@ import { useStore } from '../lib/store.jsx'
 
 const LINKS = [
   { to: '/', label: 'Today', Icon: HomeIcon },
-  { to: '/pokes', label: 'Pokes', Icon: BellIcon },
+  { to: '/nudges', label: 'Nudges', Icon: BellIcon },
   { to: '/rewards', label: 'Rewards', Icon: TrophyIcon },
   { to: '/settings', label: 'Me', Icon: UserIcon },
 ]

@@ -13,7 +13,7 @@ export const MOCK_TASKS = [
   { id: 't4', title: 'Water the plants', due: at(-1, 9), priority: 'medium', physical: true, done: false },
 ]
 
-export const MOCK_POKES = [
+export const MOCK_NUDGES = [
   { id: 'p1', taskId: 't4', level: 2, text: 'Your plants are writing their wills. Water, today?', at: at(0, 9) },
   { id: 'p2', taskId: 't1', level: 1, text: 'Groceries tonight. Your fridge is echoing.', at: at(0, 12) },
 ]
@@ -88,7 +88,7 @@ function cleanTitle(s) {
   return s
     .replace(/\s{2,}/g, ' ')
     .trim()
-    .replace(/^((hi|hey|hello|ok|okay|so|um|uh|ugh|yo)\b[,!.\s]*)+(pokey\b[,!.\s]*)?/i, '')
+    .replace(/^((hi|hey|hello|ok|okay|so|um|uh|ugh|yo)\b[,!.\s]*)+(nudgy\b[,!.\s]*)?/i, '')
     .replace(/^(please\s+)?(i want you to|i'?d like you to|can you|could you|pls|please)\s+/i, '')
     .replace(/^(also|then|plus|oh|and)\s+/i, '')
     .replace(/^i\s+(want to|wanna|might( just)?|may|will|'?ll|plan to|am going to|'?m gonna|gotta)\s+/i, '')
@@ -183,9 +183,3 @@ function toDue({ day, hours, minutes, meridiem }) {
   if (!day && due < new Date()) due.setDate(due.getDate() + 1)
   return due.toISOString()
 }
-
-export const CELEBRATIONS = [
-  (n, t) => `${n}! "${t}": DONE. Look at you, a whole professional.`,
-  (n) => `${n}, who are you and what have you done with the procrastinator?`,
-  (n, t) => `"${t}" has left the chat. Gone. Handled. Iconic, ${n}.`,
-]

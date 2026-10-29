@@ -4,7 +4,7 @@ import SoundPicker from './SoundPicker.jsx'
 
 // Top-bar speaker: opens background sound + the one volume for every sound, from any page.
 export default function SoundButton() {
-  const { volume, ambient } = useStore()
+  const { volume, ambient, muted } = useStore()
   const [open, setOpen] = useState(false)
   const box = useRef(null)
 
@@ -29,13 +29,13 @@ export default function SoundButton() {
         aria-expanded={open}
         aria-label="Sound and volume"
         title="Sound and volume"
-        className={`grid h-10 w-10 place-items-center rounded-full border-[length:var(--bw)] border-line bg-surface text-base ${ambient ? 'ring-2 ring-primary/40' : ''}`}
+        className={`grid h-10 w-10 place-items-center rounded-full border-[length:var(--bw)] border-line bg-surface text-base ${ambient && !muted ? 'ring-2 ring-primary/40' : ''}`}
       >
-        {volume === 0 ? '🔇' : volume < 0.4 ? '🔈' : '🔊'}
+        {muted || volume === 0 ? '🔇' : volume < 0.4 ? '🔈' : '🔊'}
       </button>
       {open && (
         <div className="absolute right-0 top-12 z-50 w-72 rounded-2xl border-[length:var(--bw)] border-line bg-surface p-4 shadow-card">
-          <p className="text-xs font-semibold uppercase tracking-wider text-ink/45">Background sound</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-ink/45">Sound</p>
           <SoundPicker compact />
         </div>
       )}

@@ -6,12 +6,14 @@ import { AMBIENT_LEVEL, setVolumeLevel } from '../lib/volume.js'
 
 // Keeps the chosen background sound playing on every page, and applies the one volume to all sounds. Renders nothing.
 export default function AmbientPlayer() {
-  const { ambient, volume } = useStore()
-  setVolumeLevel(volume)
+  const { ambient, volume, muted } = useStore()
+  // Muted is just volume zero for every sound that reads the shared volume (alarm, music, voice).
+  const effective = muted ? 0 : volume
+  setVolumeLevel(effective)
 
   useEffect(() => {
-    if (!ambient) return stopAmbient()
-    playAmbient(ambient, AMBIENT_LEVEL * volume)
+    if (!ambient || muted) return stopAmbient()
+    playAmbient(ambient, AMBIENT_LEVEL * effective)
     // Sound can't start until the user taps once after a reload; pick it up then.
     const wake = () => resumeAmbient()
     window.addEventListener('pointerdown', wake)
@@ -19,12 +21,12 @@ export default function AmbientPlayer() {
       window.removeEventListener('pointerdown', wake)
       stopAmbient()
     }
-  }, [ambient]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [ambient, muted]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    setAmbientVolume(AMBIENT_LEVEL * volume)
+    setAmbientVolume(AMBIENT_LEVEL * effective)
     updateMusicVolume()
-  }, [volume])
+  }, [effective])
 
   return null
 }

@@ -3,8 +3,10 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useStore, PROOF_BONUS } from '../lib/store.jsx'
 import { Button, Card, ProofBadge } from '../components/ui.jsx'
 import { CameraIcon } from '../components/Icons.jsx'
+import { checkPhoto, guessPhrase, toJpeg } from '../lib/proof.js'
 
-// Prototype photo proof: shows the flow and a fake outline. SAM 3.1 comes later.
+// Photo proof: the photo goes to SAM 3.1 with what to look for (a noun phrase from the task).
+// Found: Complete, claim the bonus. Not found: try another angle. Can't check: taken at their word.
 export default function ProofPage() {
   const { id } = useParams()
   const { name, tasks, completeTask, updateTask } = useStore()
@@ -12,12 +14,15 @@ export default function ProofPage() {
   const task = tasks.find((t) => t.id === id)
   // Coming back to a task that already has a photo shows it, rather than an empty uploader.
   const [photo, setPhoto] = useState(task?.photo ?? null)
-  const [state, setState] = useState(task?.photo ? 'found' : 'idle') // idle | checking | found
+  const [state, setState] = useState(task?.photo ? 'found' : 'idle') // idle | checking | found | notfound
+  // What happened with this visit's photo: verified by SAM, skipped (couldn't check), or restored (came back to it).
+  const [note, setNote] = useState('restored')
+  const [phrase, setPhrase] = useState(() => task?.proofOf || (task ? guessPhrase(task.title) : ''))
 
   if (!task) return <p className="text-center">That task wandered off. <Link to="/" className="underline">Home</Link></p>
   const claimed = task.done && task.proof
 
-  // Keep a small JPEG of the photo on the task, so the card (and the poke break) can show it
+  // Keep a small JPEG of the photo on the task, so the card (and the nudge break) can show it
   // even if the user never finishes the proof.
   function saveThumb(url) {
     const img = new Image()
@@ -32,14 +37,21 @@ export default function ProofPage() {
     img.src = url
   }
 
-  function pick(e) {
+  async function pick(e) {
     const file = e.target.files?.[0]
     if (!file) return
     const url = URL.createObjectURL(file)
     setPhoto(url)
     saveThumb(url)
     setState('checking')
-    setTimeout(() => setState('found'), 1200)
+    let found = null
+    try {
+      found = (await checkPhoto(await toJpeg(url), phrase.trim() || task.title)).found
+    } catch {}
+    setNote(found === true ? 'verified' : 'skipped')
+    setState(found === false ? 'notfound' : 'found')
+    // If they changed what to look for, remember it on the task.
+    if (phrase.trim() && phrase.trim() !== task.proofOf) updateTask(task.id, { proofOf: phrase.trim() })
   }
 
   function accept() {
@@ -52,6 +64,16 @@ export default function ProofPage() {
     navigate('/')
   }
 
+  const message = claimed
+    ? `Proof accepted. +${PROOF_BONUS} banked.`
+    : state === 'notfound'
+      ? `I can't see "${phrase}" in that. Try another angle, or change what I'm looking for.`
+      : note === 'verified'
+        ? `Found it: ${phrase}.`
+        : note === 'skipped'
+          ? "Couldn't check this one just now, so I'll take your word."
+          : 'Photo added.'
+
   return (
     <div className="flex flex-col gap-4 pt-2">
       <header>
@@ -60,22 +82,32 @@ export default function ProofPage() {
       </header>
 
       <Card className="flex flex-col items-center gap-4">
+        {!claimed && (
+          <label className="flex w-full items-center gap-2 text-sm text-ink/60">
+            <span className="shrink-0">I'll look for</span>
+            <input
+              value={phrase}
+              onChange={(e) => setPhrase(e.target.value)}
+              maxLength={80}
+              aria-label="What Nudgy should find in the photo"
+              className="min-w-0 flex-1 rounded-xl border-[length:var(--bw)] border-line bg-bg px-3 py-1.5 text-[15px] font-medium text-ink outline-none focus:ring-2 focus:ring-primary/40"
+            />
+          </label>
+        )}
+
         {photo ? (
           <div className="relative w-full overflow-hidden rounded-2xl">
             <img src={photo} alt="Your proof" className="w-full" />
-            {state === 'found' && <ProofBadge complete={claimed} className="absolute left-3 top-3" />}
-            {state === 'found' && !claimed && (
+            {state === 'found' && <ProofBadge complete className="absolute left-3 top-3" />}
+            {(state === 'found' || state === 'notfound') && !claimed && (
               <label className="absolute bottom-3 right-3 cursor-pointer rounded-full bg-surface/90 px-3 py-1.5 text-xs font-semibold shadow-card backdrop-blur">
                 Retake
                 <input type="file" accept="image/*" capture="environment" onChange={pick} className="sr-only" />
               </label>
             )}
-            {state === 'found' && (
-              <div className="pointer-events-none absolute inset-[18%] rounded-[40%] border-4 border-dashed border-success bg-success/15" />
-            )}
             {state === 'checking' && (
-              <div className="absolute inset-0 grid place-items-center bg-ink/40 font-display text-xl text-on-primary">
-                Squinting at it…
+              <div className="absolute inset-0 grid place-items-center bg-ink/40 px-6 text-center font-display text-xl text-on-primary">
+                Looking for {phrase}…
               </div>
             )}
           </div>
@@ -84,23 +116,21 @@ export default function ProofPage() {
             <span>
               <CameraIcon size={36} className="mx-auto text-primary" />
               <span className="mt-2 block font-display text-xl">Snap proof</span>
-              <span className="block text-sm text-ink/50">+{PROOF_BONUS} bonus points</span>
+              <span className="block text-sm text-ink/50">+{PROOF_BONUS} bonus coins</span>
             </span>
             <input type="file" accept="image/*" capture="environment" onChange={pick} className="sr-only" />
           </label>
         )}
 
-        {state === 'found' && (
-          <p className="pop-in text-center font-display text-lg">
-            {claimed ? `Proof accepted. +${PROOF_BONUS} banked.` : 'Found it. Fridge is no longer a museum of condiments.'}
-          </p>
-        )}
+        {(state === 'found' || state === 'notfound') && <p className="pop-in text-center font-display text-lg">{message}</p>}
       </Card>
 
       {claimed ? (
         <Button variant="ghost" onClick={() => navigate(-1)}>Back</Button>
       ) : state === 'found' ? (
         <Button onClick={accept}>Claim +{PROOF_BONUS} bonus</Button>
+      ) : task.physical ? (
+        <Button variant="ghost" onClick={() => navigate(-1)}>Not now</Button>
       ) : (
         <Button variant="ghost" onClick={skip}>Skip proof (no bonus)</Button>
       )}

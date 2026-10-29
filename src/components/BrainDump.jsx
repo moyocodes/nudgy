@@ -4,6 +4,7 @@ import { Button } from './ui.jsx'
 import { ArrowIcon, MicIcon } from './Icons.jsx'
 import { friendlyDue } from '../lib/format.js'
 import { getVolume } from '../lib/volume.js'
+import { useStore } from '../lib/store.jsx'
 
 const canRecord = typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia
 
@@ -13,10 +14,11 @@ const SEND_PHRASE = /\b(send it|send)[.!\s]*$/i
 const isPhone = () => window.matchMedia('(max-width: 639px)').matches
 
 // about: a reminder picked with @ (from here or a task card); the text is then instructions for it.
-// thinking: how many dumps Pokey is still working on; they run in the background.
+// thinking: how many dumps Nudgy is still working on; they run in the background.
 // Full screen: automatic when typing on a phone, or via the expand button anywhere.
-// question: Pokey's open question about a reminder; answer it here in plain words.
-export default function BrainDump({ onSubmit, reminders = [], about, onPickAbout, thinking = 0, question }) {
+// question: Nudgy's open question about a reminder; answer it here in plain words.
+export default function BrainDump({ onSubmit, reminders = [], about, onPickAbout, thinking = 0, question, onDismissQuestion }) {
+  const { muted } = useStore()
   const [text, setText] = useState('')
   const [interim, setInterim] = useState('')
   const [listening, setListening] = useState(false)
@@ -31,7 +33,7 @@ export default function BrainDump({ onSubmit, reminders = [], about, onPickAbout
   const inputRef = useRef(null)
   textRef.current = text
 
-  useEffect(() => () => stopRef.current?.(), [])
+  useEffect(() => () => { stopRef.current?.() }, [])
 
   // Full screen: lock the page behind it, and Esc closes it.
   useEffect(() => {
@@ -119,10 +121,13 @@ export default function BrainDump({ onSubmit, reminders = [], about, onPickAbout
       </div>
       {question && !about && (
         <p className="mb-1 flex items-start gap-2 rounded-2xl rounded-bl-md bg-soft px-3 py-2 pr-9 text-sm leading-snug">
-          <span className="shrink-0 font-semibold text-primary">Pokey:</span>
+          <span className="shrink-0 font-semibold text-primary">Nudgy:</span>
           <span className="flex-1">{question}</span>
+          {onDismissQuestion && (
+            <button type="button" onClick={onDismissQuestion} className="-my-1 shrink-0 rounded-full px-2 py-1 text-xs font-semibold text-ink/50 hover:bg-ink/5 hover:text-ink">No thanks</button>
+          )}
           {/* Read the question aloud with the device's own voice (no model call). */}
-          {'speechSynthesis' in window && (
+          {'speechSynthesis' in window && !muted && (
             <button
               type="button"
               onClick={() => {
@@ -133,7 +138,7 @@ export default function BrainDump({ onSubmit, reminders = [], about, onPickAbout
                 line.volume = getVolume()
                 window.speechSynthesis.speak(line)
               }}
-              aria-label="Hear Pokey's question"
+              aria-label="Hear Nudgy's question"
               title="Hear it"
               className="-my-1 shrink-0 rounded-full px-1.5 py-1 text-ink/50 hover:bg-ink/5 hover:text-ink"
             >
@@ -170,7 +175,7 @@ export default function BrainDump({ onSubmit, reminders = [], about, onPickAbout
         placeholder={
           about
             ? 'What should I do with it? "7pm", "every Monday", "high priority", "done"…'
-            : question ? 'Answer Pokey, or add something new…'
+            : question ? 'Answer Nudgy, or add something new…'
             : expanded ? "Call the dentist, buy oat milk… or just tell me you're swamped." : 'Add something, or brain-dump it all…'
         }
         className={`w-full resize-none bg-transparent p-2 leading-relaxed outline-none placeholder:text-ink/35 ${full ? 'flex-1 text-lg' : 'pr-9 text-base'}`}
@@ -211,7 +216,7 @@ export default function BrainDump({ onSubmit, reminders = [], about, onPickAbout
                 : 'Talk or type. Enter sends.'}
         </p>
         <Button size="sm" onClick={() => submit()} disabled={!text.trim()}>
-          {about ? 'Tell Pokey' : 'Add tasks'} <ArrowIcon size={16} />
+          {about ? 'Tell Nudgy' : 'Add tasks'} <ArrowIcon size={16} />
         </Button>
       </div>
       {picking && (
@@ -234,7 +239,7 @@ export default function BrainDump({ onSubmit, reminders = [], about, onPickAbout
     {thinking > 0 && (
       <p role="status" className="-mt-2 flex items-center gap-2 px-2 text-xs text-ink/50">
         <span className="h-2 w-2 animate-pulse rounded-full bg-primary" />
-        Pokey's on it{thinking > 1 ? ` (${thinking})` : ''}… carry on, I'll shout when it's sorted.
+        Nudgy's on it{thinking > 1 ? ` (${thinking})` : ''}… carry on, I'll shout when it's sorted.
       </p>
     )}
     </>

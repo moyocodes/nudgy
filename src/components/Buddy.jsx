@@ -6,10 +6,10 @@ import { getVolume } from '../lib/volume.js'
 
 const canSpeak = typeof window !== 'undefined' && 'speechSynthesis' in window
 
-// Pokey as an on-screen buddy: pops up from the corner, talks in a bubble (mouth moving),
+// Nudgy as an on-screen buddy: pops up from the corner, talks in a bubble (mouth moving),
 // and reads the line aloud with the browser's own voice when sound is on. No model calls.
 export default function Buddy() {
-  const { buddy, setBuddy, voiceOn, setVoiceOn } = useStore()
+  const { buddy, setBuddy, voiceOn, setVoiceOn, muted } = useStore()
   const [talking, setTalking] = useState(false)
 
   useEffect(() => {
@@ -19,7 +19,8 @@ export default function Buddy() {
     let hideTimer
     setTalking(true)
 
-    if (voiceOn && canSpeak) {
+    // Out loud only with the user's permission ("Talk out loud"). Sound off still wins.
+    if (voiceOn && canSpeak && !muted) {
       window.speechSynthesis.cancel()
       const line = new SpeechSynthesisUtterance(buddy.text)
       line.rate = 1.05
@@ -76,7 +77,7 @@ export default function Buddy() {
           <motion.button
             type="button"
             onClick={() => setBuddy(null)}
-            aria-label="Dismiss Pokey"
+            aria-label="Dismiss Nudgy"
             animate={talking ? { y: [0, -4, 0], rotate: [0, -3, 0] } : { y: 0, rotate: 0 }}
             transition={talking ? { duration: 0.5, repeat: Infinity, ease: 'easeInOut' } : { duration: 0.2 }}
             className="shrink-0"

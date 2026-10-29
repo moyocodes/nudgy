@@ -12,3 +12,9 @@
 - Photo proof with SAM 3.1: the server uploads the photo and asks SAM 3.1 to find the task's object (e.g. "oat milk" from "Buy oat milk"); the client shrinks the photo to a small JPEG first and the same photo is never checked twice.
 - Personal badge art with Muse Image: one picture per earned badge, made only when the user taps "Create my badge", in their theme colours and based on what they actually did. An optional script makes a default set.
 - Account menu: shows you're signed in and opens a small menu with Today, Me and Log out.
+
+## Wed Oct 28 — Renamed the app from Pokey to Nudgy, and "poke" to "nudge", everywhere (UI, server prompts, storage keys, manifest, docs, wake word spellings). Saved local data and the device id reset because the storage keys changed. Older entries above keep the old name on purpose.
+- Daily goals: recurring reminders due today show as a checklist with progress on Today; ticking moves them to the next slot and records lastDoneAt, and photo-proof goals go to the proof page first.
+- Reminder groups (Overdue, Today, Later, Someday, Done) are always open now, split into pages of 10, and one person can have at most 30 open reminders; extras are skipped and Nudgy says so.
+- Alarm chime fixed: it played at the same moment as the spoken nudge and before audio was unlocked, so it was never heard. Now the chime is off until the user allows it (which also unlocks audio), it plays first and the voice waits for it, and "Alarm sound" is a row in Set Nudgy up.
+- Removed the "hey Nudgy" wake word and hands-free conversations (component, listener, Me toggle, permission text).

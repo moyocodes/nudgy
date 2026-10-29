@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Link } from 'react-router-dom'
-import { useStore } from '../lib/store.jsx'
+import { Link, useNavigate } from 'react-router-dom'
+import { MAX_OPEN_TASKS, useStore } from '../lib/store.jsx'
 import { badgeStats, mockExtract, nextBadge } from '../lib/mockData.js'
 import { countdown, friendlyDue, isOverdue, nextDue, savedSummary } from '../lib/format.js'
 import { describeRepeat, nextOccurrence } from '../lib/schedule.js'
+import { greetingLine, isGreeting } from '../lib/phrases.js'
+import { BACKSTOP, INTENT_HINT, OFFER, listRequest, looksPhysical, taskSummary, whenAsk } from '../lib/intent.js'
 import BrainDump from '../components/BrainDump.jsx'
 import SoundPicker from '../components/SoundPicker.jsx'
 import TaskCard from '../components/TaskCard.jsx'
@@ -13,27 +15,44 @@ import Mascot from '../components/Mascot.jsx'
 import { BellIcon, ChevronIcon, TrophyIcon } from '../components/Icons.jsx'
 
 
-// What Pokey says while the model reads a brain dump. One at random each time.
+// What Nudgy says while the model reads a brain dump. One at random each time.
 const THINKING = [
   'Untangling your thoughts. Bring snacks.',
   'Sorting the to-dos from the oh-nos…',
   'Decoding brain soup. Mmm, chunky.',
   'Rummaging through your brain drawer…',
-  'Hold on, sharpening my poking finger.',
+  'Hold on, sharpening my nudging finger.',
   'Turning chaos into a checklist. Very wizardly.',
   'Reading between the lines. And the umms.',
   'One sec, filing this under "future you".',
 ]
 
-// The rundown plays by itself once per page load (every reload), not on every return to Today.
+// When the rundown opens by itself, as capped by the user's setting: every visit, every 4 hours, once a day,
+// or never. It is always one tap away on Today. The time it last opened is kept in localStorage.
+const RUNDOWN_AT = 'nudgy:rundownAt'
+function rundownDue(mode) {
+  if (mode === 'never') return false
+  if (mode === 'always') return true
+  let last = 0
+  try { last = Number(localStorage.getItem(RUNDOWN_AT)) || 0 } catch {}
+  if (mode === 'daily') return new Date(last).toDateString() !== new Date().toDateString()
+  return Date.now() - last >= 4 * 60 * 60 * 1000
+}
+
+// At most once per page load (not on every return to Today), and only when the cap allows.
 let rundownShownThisLoad = false
 function useDailyStory(ready) {
+  const { setStoryOpen, rundownMode } = useStore()
   const [open, setOpen] = useState(false)
   useEffect(() => {
     if (!ready || rundownShownThisLoad) return
     rundownShownThisLoad = true
+    if (!rundownDue(rundownMode)) return
+    try { localStorage.setItem(RUNDOWN_AT, String(Date.now())) } catch {}
+    // Tell the rest of the app now, so the permissions card doesn't pop up while the rundown mounts.
+    setStoryOpen(true)
     setOpen(true)
-  }, [ready])
+  }, [ready]) // eslint-disable-line react-hooks/exhaustive-deps
   return [open, () => setOpen(true), () => setOpen(false)]
 }
 
@@ -62,45 +81,50 @@ function useMinuteClock() {
   return now
 }
 
-const SOON_MS = 24 * 60 * 60 * 1000
 
-// A collapsible group. Collapsed, it still shows anything due in the next 24 hours.
-function TaskGroup({ label, list, now }) {
-  const [expanded, setExpanded] = useState(false)
-  // A task arriving in this group after it first rendered (just added or moved here) opens it,
-  // so new things never land out of sight.
-  const seen = useRef(null)
-  useEffect(() => {
-    const ids = list.map((t) => t.id)
-    if (seen.current && ids.some((id) => !seen.current.has(id))) setExpanded(true)
-    seen.current = new Set(ids)
-  }, [list])
-  const soon = list.filter((t) => !t.done && t.due && new Date(t.due) - now < SOON_MS && new Date(t.due) - now > 0)
-  const shown = expanded ? list : soon
-  const hidden = list.length - shown.length
+// A group of reminders, always open. Long groups are split into pages of PAGE_SIZE.
+const PAGE_SIZE = Number(import.meta.env.VITE_PAGE_SIZE) || 10
+
+// Said when the reminder limit stopped some from being saved.
+const limitLine = (skipped) => (skipped > 0 ? `You're at the ${MAX_OPEN_TASKS}-reminder limit, so I skipped ${skipped}. Tick a few off and try again.` : '')
+
+// collapsed: starts closed (Done); tap the heading to open it. The count always shows.
+function TaskGroup({ label, list, collapsed = false }) {
+  const [page, setPage] = useState(0)
+  const [open, setOpen] = useState(!collapsed)
+  const pages = Math.max(1, Math.ceil(list.length / PAGE_SIZE))
+  // The list can shrink (ticked off, deleted) while on a later page.
+  useEffect(() => { if (page > pages - 1) setPage(pages - 1) }, [page, pages])
+  const shown = list.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+  const pager = 'min-h-8 rounded-full px-3 text-xs font-semibold text-primary hover:bg-ink/5 disabled:text-ink/25 disabled:hover:bg-transparent'
   return (
     <section>
-      <button
-        type="button"
-        onClick={() => setExpanded((e) => !e)}
-        aria-expanded={expanded}
-        className={`mb-2 flex w-full items-center gap-1.5 text-xs font-semibold uppercase tracking-wider ${label === 'Overdue' ? 'text-accent' : 'text-ink/45'}`}
-      >
-        <ChevronIcon size={14} className={`transition-transform ${expanded ? '' : '-rotate-90'}`} />
-        {label} · {list.length}
-        {!expanded && soon.length > 0 && <span className="normal-case tracking-normal text-primary">· {soon.length} due soon</span>}
-      </button>
-      {shown.length > 0 && (
-        <ul className="space-y-2">
-          <AnimatePresence initial={false}>
-            {shown.map((t) => <TaskCard key={t.id} task={t} />)}
-          </AnimatePresence>
-        </ul>
-      )}
-      {!expanded && hidden > 0 && (
-        <button type="button" onClick={() => setExpanded(true)} className="mt-1 text-xs font-semibold text-ink/50 hover:text-ink">
-          Show {hidden} more
+      {collapsed ? (
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          className="mb-2 flex w-full items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-ink/45"
+        >
+          <ChevronIcon size={14} className={`transition-transform ${open ? '' : '-rotate-90'}`} />
+          {label} · {list.length}
         </button>
+      ) : (
+        <h2 className={`mb-2 text-xs font-semibold uppercase tracking-wider ${label === 'Overdue' ? 'text-accent' : 'text-ink/45'}`}>
+          {label} · {list.length}
+        </h2>
+      )}
+      {open && <ul className="space-y-2">
+        <AnimatePresence initial={false}>
+          {shown.map((t) => <TaskCard key={t.id} task={t} />)}
+        </AnimatePresence>
+      </ul>}
+      {open && pages > 1 && (
+        <div className="mt-2 flex items-center justify-between">
+          <button type="button" className={pager} disabled={page === 0} onClick={() => setPage((p) => p - 1)}>Previous</button>
+          <span className="text-xs text-ink/50">{page * PAGE_SIZE + 1}–{Math.min(list.length, (page + 1) * PAGE_SIZE)} of {list.length}</span>
+          <button type="button" className={pager} disabled={page === pages - 1} onClick={() => setPage((p) => p + 1)}>Next</button>
+        </div>
       )}
     </section>
   )
@@ -160,17 +184,53 @@ function WeekGlance({ tasks, day, onPickDay }) {
   )
 }
 
-// "hey Pokey", "hi Moyo", "good morning!" with nothing else: a hello, not a task.
-const GREETING = /^\s*(hey|hi|hiya|hello|heya|yo|sup|howdy|good (morning|afternoon|evening))\b[\s,!.]*(\p{L}+)?[\s,!.?]*$/iu
-const GREETING_REPLIES = [
-  (n) => `Hey ${n}! Pokey at your service, finger warmed up.`,
-  (n) => `Hi ${n}! Missed me? I missed poking you.`,
-  (n) => `Well hello, ${n}.`,
-  (n) => `${n}! There you are.`,
-]
-
 // Backup for the model's "overwhelmed" mood, and the only check when the model is unreachable.
 const OVERWHELMED = /\b(overwhelm\w*|swamped|stressed|too much|drowning|can'?t cope|close (my|the|all|every)\w*|clear (it|my|the|every)\w*|hide (it|every)\w*)\b/i
+
+// Daily goals: recurring reminders that fall on today, as a checklist. Ticking one moves it to its
+// next slot, so "done today" comes from lastDoneAt. Photo-proof goals go to the proof page instead.
+function DailyGoals({ tasks, onTick }) {
+  const navigate = useNavigate()
+  const today = new Date()
+  const goals = tasks.filter((t) => !t.done && t.repeat?.some((slot) => slot.days.includes(today.getDay())))
+  if (!goals.length) return null
+  const doneToday = (t) => t.lastDoneAt && new Date(t.lastDoneAt).toDateString() === today.toDateString()
+  const count = goals.filter(doneToday).length
+  return (
+    <section aria-label="Daily goals" className={card}>
+      <div className="flex items-baseline justify-between">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-ink/45">Daily goals</h2>
+        <span className="text-xs font-semibold text-primary">{count}/{goals.length} today</span>
+      </div>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-ink/5">
+        <div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${(count / goals.length) * 100}%` }} />
+      </div>
+      <ul className="mt-3 space-y-1">
+        {goals.map((t) => {
+          const ticked = doneToday(t)
+          return (
+            <li key={t.id}>
+              <button
+                type="button"
+                disabled={ticked}
+                onClick={() => (t.physical ? navigate(`/proof/${t.id}`) : onTick(t.id))}
+                className="-mx-2 flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left hover:bg-ink/5 disabled:hover:bg-transparent"
+              >
+                <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border-[1.5px] ${ticked ? 'border-primary bg-primary text-on-primary' : 'border-ink/25'}`}>
+                  {ticked && <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden><path d="M2.5 6.5l2.2 2L9.5 3.5" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className={`block truncate text-[15px] ${ticked ? 'text-ink/45 line-through' : 'font-medium'}`}>{t.title}</span>
+                  <span className="block text-xs text-ink/50">{describeRepeat(t.repeat)}{t.physical && !ticked ? ' · photo proof' : ''}</span>
+                </span>
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+    </section>
+  )
+}
 
 // One task instead of a list: overdue first, then the soonest, then the most important.
 function CalmView({ tasks, onExit }) {
@@ -194,8 +254,8 @@ function CalmView({ tasks, onExit }) {
       <Link to="/play" className={`${card} flex items-center gap-3 hover:bg-ink/[0.02]`}>
         <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-soft"><Mascot size={26} /></span>
         <span className="min-w-0 flex-1">
-          <span className="block text-sm font-semibold">Take a 30-second poke break?</span>
-          <span className="block text-xs text-ink/50">Whack a few pokes, then come back lighter.</span>
+          <span className="block text-sm font-semibold">Take a 30-second nudge break?</span>
+          <span className="block text-xs text-ink/50">Whack a few nudges, then come back lighter.</span>
         </span>
         <span className="text-sm font-semibold text-primary">Play</span>
       </Link>
@@ -228,10 +288,10 @@ function DayView({ day, tasks, onClear }) {
   )
 }
 
-// The panels beside the list: rundown, next badge, recent pokes, the week, poke break.
+// The panels beside the list: rundown, next badge, recent nudges, the week, nudge break.
 // A right rail on desktop; below the list on mobile.
-function RailContent({ open, overdue, pokes, tasks, next, stats, onRundown, upcoming, now, day, onPickDay }) {
-  const recent = [...pokes].reverse().slice(0, 3)
+function RailContent({ open, overdue, nudges, tasks, next, stats, onRundown, upcoming, now, day, onPickDay }) {
+  const recent = [...nudges].reverse().slice(0, 3)
   return (
     <>
       <div className={`${card} flex items-center gap-3`}>
@@ -252,8 +312,8 @@ function RailContent({ open, overdue, pokes, tasks, next, stats, onRundown, upco
 
       <div className={card}>
         <div className="flex items-baseline justify-between">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-ink/45">Recent pokes</h2>
-          <Link to="/pokes" className="text-xs font-semibold text-primary">See all</Link>
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-ink/45">Recent nudges</h2>
+          <Link to="/nudges" className="text-xs font-semibold text-primary">See all</Link>
         </div>
         {recent.length === 0 ? (
           <p className="mt-3 text-sm text-ink/50">Quiet. Suspiciously quiet.</p>
@@ -261,7 +321,7 @@ function RailContent({ open, overdue, pokes, tasks, next, stats, onRundown, upco
           <ul className="mt-3 space-y-3">
             {recent.map((p) => (
               <li key={p.id}>
-                <Link to="/pokes" className="-mx-2 flex gap-2.5 rounded-xl px-2 py-1 hover:bg-ink/5">
+                <Link to="/nudges" className="-mx-2 flex gap-2.5 rounded-xl px-2 py-1 hover:bg-ink/5">
                   <BellIcon size={15} className="mt-0.5 shrink-0 text-primary" />
                   <span className="min-w-0">
                     <span className="line-clamp-2 block text-[13px] leading-snug">{p.text}</span>
@@ -283,8 +343,8 @@ function RailContent({ open, overdue, pokes, tasks, next, stats, onRundown, upco
 
       <Link to="/play" className={`${card} flex items-center gap-3 hover:bg-ink/[0.02]`}>
         <span className="flex-1">
-          <span className="block text-sm font-semibold">Poke break</span>
-          <span className="block text-xs text-ink/50">30 seconds of whack-a-poke.</span>
+          <span className="block text-sm font-semibold">Nudge break</span>
+          <span className="block text-xs text-ink/50">30 seconds of whack-a-nudge.</span>
         </span>
         <span className="text-sm font-semibold text-primary">Play</span>
       </Link>
@@ -293,7 +353,7 @@ function RailContent({ open, overdue, pokes, tasks, next, stats, onRundown, upco
 }
 
 export default function HomePage() {
-  const { name, tasks, addTasks, introSeen, pokes, completeTask, snoozeTask, updateTask, deleteTask, replaceTasks, replacePoints, points, aboutTaskId, setAboutTaskId, streak, tutorialSeen, openTutorial, say, chat, addChat } = useStore()
+  const { name, buddyName, tasks, addTasks, introSeen, nudges, completeTask, snoozeTask, updateTask, deleteTask, replaceTasks, replacePoints, points, aboutTaskId, setAboutTaskId, streak, tutorialSeen, openTutorial, say, chat, addChat } = useStore()
   const [storyOpen, openStory, closeStory] = useDailyStory(tutorialSeen && introSeen)
   const [askingProof, setAskingProof] = useState(false)
   // A day picked from the week strip ("Wed Oct 28 2026"), or null for the full list.
@@ -328,7 +388,7 @@ export default function HomePage() {
     setLastChange(null)
     const line = 'Undone. Like it never happened.'
     say(line)
-    addChat({ from: 'pokey', text: line })
+    addChat({ from: 'nudgy', text: line })
   }
 
   // Applies the model's actions on existing reminders and describes what really changed.
@@ -337,7 +397,11 @@ export default function HomePage() {
     for (const a of actions) {
       const task = listed[a.n - 1]
       if (!task) continue
-      if (a.type === 'done') { completeTask(task.id); said.push(`Ticked off "${task.title}".`) }
+      if (a.type === 'done') {
+        // Photo-proof tasks need the photo, whoever says it's done.
+        if (task.physical) said.push(`"${task.title}" needs a photo first. Tap the camera on it.`)
+        else { completeTask(task.id); said.push(`Ticked off "${task.title}".`) }
+      }
       if (a.type === 'delete') { deleteTask(task.id); said.push(`Binned "${task.title}".`) }
       if (a.type === 'snooze') { snoozeTask(task.id); said.push(`Snoozed "${task.title}" for an hour.`) }
       if (a.type === 'update') {
@@ -345,16 +409,22 @@ export default function HomePage() {
         if (a.due) changes.due = new Date(a.due).toISOString()
         if (a.title) changes.title = a.title
         if (a.priority) changes.priority = a.priority
+        if ('proof' in a) {
+          changes.physical = !!a.proof
+          if (a.proofOf) changes.proofOf = a.proofOf
+        }
         if ('repeat' in a) {
           changes.repeat = a.repeat
           if (a.repeat && !a.due) changes.due = nextOccurrence(a.repeat)?.toISOString() ?? task.due
         }
-        // Setting a time or name answers any question Pokey had about this task.
+        // Setting a time or name answers any question Nudgy had about this task.
         if (changes.due || changes.title) changes.ask = null
         updateTask(task.id, changes)
         const title = a.title || task.title
         said.push(
-          'repeat' in a
+          'proof' in a
+            ? a.proof ? `"${title}" now needs a photo to finish.` : `"${title}" no longer needs a photo.`
+            : 'repeat' in a
             ? a.repeat ? `"${title}" now repeats: ${describeRepeat(a.repeat)}.` : `"${title}" won't repeat any more.`
             : a.due ? `Moved "${title}" to ${friendlyDue(changes.due).toLowerCase()}.`
             : a.priority ? `"${title}" is now ${a.priority} priority.`
@@ -365,9 +435,12 @@ export default function HomePage() {
     return said.join(' ')
   }
 
-  // Dumps still being worked on. The page stays usable meanwhile; this just shows a "Pokey's on it" pill.
+  // Dumps still being worked on. The page stays usable meanwhile; this just shows a "Nudgy's on it" pill.
   const [thinking, setThinking] = useState(0)
+  // A question with no reminder to hang on ("what did you mean?"), kept above the box until answered.
+  const [pendingQuestion, setPendingQuestion] = useState(null)
   async function handleDump(text) {
+    setPendingQuestion(null)
     setThinking((n) => n + 1)
     try {
       await processDump(text)
@@ -377,17 +450,24 @@ export default function HomePage() {
   }
 
   async function processDump(text) {
-    // A bare greeting ("hey Pokey", "hi Moyo", "good morning") gets a hello back, no model call.
-    if (GREETING.test(text)) {
+    // A bare greeting ("hey Nudgy", "hi Moyo", "good morning") gets a hello back, no model call.
+    if (isGreeting(text, [name, buddyName])) {
       const open = tasks.filter((t) => !t.done)
       const next = nextDue(tasks)
-      const hello = GREETING_REPLIES[Math.floor(Math.random() * GREETING_REPLIES.length)](name || 'friend')
+      const hello = greetingLine(name || 'friend', buddyName || 'Nudgy', Date.now(), new Date().getHours())
       const status = open.length
         ? `${open.length} ${open.length === 1 ? 'thing' : 'things'} on${next ? `, next up: ${next.title}` : ''}. What's on your mind?`
         : 'Your list is empty. Suspicious. What are we remembering?'
       const line = `${hello} ${status}`
       say(line)
-      return addChat({ from: 'you', text }, { from: 'pokey', text: line })
+      return addChat({ from: 'you', text }, { from: 'nudgy', text: line })
+    }
+    // "What do I have today?" is a question about the list, not a new reminder: answer it from the real list.
+    const scope = listRequest(text)
+    if (scope) {
+      const line = taskSummary(tasks, scope, name || 'friend')
+      say(line)
+      return addChat({ from: 'you', text }, { from: 'nudgy', text: line })
     }
     // A bare "undo" needs no model call.
     if (/^\s*(undo( that| it)?|take (that|it) back)[.!\s]*$/i.test(text)) {
@@ -408,14 +488,14 @@ export default function HomePage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          text, now, name,
+          text, now, name, buddy: buddyName,
           history: chat.slice(-4).map(({ from, text }) => ({ from, text })),
           selected: about ? 1 : null,
           reminders: listed.map((t) => ({ title: t.title, due: t.due ? new Date(new Date(t.due).getTime() - local.getTimezoneOffset() * 60000).toISOString() : null, ask: t.ask?.text ?? null })),
         }),
       })
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.statusText)
-      const { reply, mood, actions = [], tasks: found } = await r.json()
+      const { reply, mood, followup, actions = [], tasks: found } = await r.json()
       if (mood === 'overwhelmed' || OVERWHELMED.test(text)) goCalm()
       if (actions.some((a) => a.type === 'undo')) {
         addChat({ from: 'you', text: said })
@@ -423,60 +503,75 @@ export default function HomePage() {
       }
       const before = tasks
       const changed = applyActions(actions, listed)
-      const saved = found.map((t, i) => ({
-        id: `x${Date.now()}${i}`,
-        title: t.title,
-        due: t.due ? new Date(t.due).toISOString() : t.repeat ? nextOccurrence(t.repeat)?.toISOString() ?? null : null,
-        priority: t.priority,
-        physical: t.proof,
-        ask: t.ask,
-        repeat: t.repeat,
-        done: false,
-      }))
+      const room = Math.max(0, MAX_OPEN_TASKS - tasks.filter((t) => !t.done).length)
+      const saved = found.slice(0, room).map((t, i) => {
+        const due = t.due ? new Date(t.due).toISOString() : t.repeat ? nextOccurrence(t.repeat)?.toISOString() ?? null : null
+        return {
+          id: `x${Date.now()}${i}`,
+          title: t.title,
+          due,
+          priority: t.priority,
+          // Photo proof is ticked for meetings, places and errands, by the model or by the local backstop.
+          physical: !!t.proof || looksPhysical(t.title),
+          proofOf: t.proofOf || undefined,
+          ask: t.ask ?? (due ? null : whenAsk(t.title)),
+          repeat: t.repeat,
+          done: false,
+        }
+      })
       addTasks(saved)
       if (saved.length || changed) setLastChange({ before, points })
       // The quip is the model's; the "Set: ..." and action parts come from what was really changed.
       // Keep the conversation going: ask about a new task first, else the next one still waiting.
       const answered = new Set(actions.filter((a) => a.type !== 'update' || a.due || a.title).map((a) => listed[a.n - 1]?.id))
       const question = saved.find((t) => t.ask)?.ask.text ?? listed.find((t) => t.ask && !answered.has(t.id))?.ask.text
-      const line = [reply || (saved.length || changed ? '' : 'Nothing to do in there. Just vibes.'), changed, savedSummary(saved), question].filter(Boolean).join(' ')
+      // Nothing saved but it reads like a reminder: ask, don't shrug. The model's followup wins over the backstop.
+      const nothing = !saved.length && !changed
+      let ask = question ?? (followup || (nothing && !mood && INTENT_HINT.test(text) ? BACKSTOP : ''))
+      // If the model had nothing to say either, don't shrug: say no reminder was found and offer to set one.
+      if (nothing && !mood && !reply && !ask) ask = OFFER
+      if (!question && ask) setPendingQuestion(ask)
+      const line = [reply, changed, savedSummary(saved), limitLine(found.length - saved.length), ask].filter(Boolean).join(' ')
       say(line)
-      addChat({ from: 'you', text: said, mood }, { from: 'pokey', text: line, taskIds: saved.map((t) => t.id) })
+      addChat({ from: 'you', text: said, mood }, { from: 'nudgy', text: line, taskIds: saved.map((t) => t.id) })
     } catch (err) {
       console.warn('[extract] falling back to local parser:', err.message)
       if (OVERWHELMED.test(text)) {
         goCalm()
         const line = "Deep breath. I've folded everything away. Just one thing for now."
         say(line)
-        return addChat({ from: 'you', text: said, mood: 'overwhelmed' }, { from: 'pokey', text: line })
+        return addChat({ from: 'you', text: said, mood: 'overwhelmed' }, { from: 'nudgy', text: line })
       }
-      // The local parser only handles simple lists. A reply to Pokey's question, an @ instruction
+      // The local parser only handles simple lists. A reply to Nudgy's question, an @ instruction
       // or a long sentence would just become a junk task, so say so instead.
       if (about || listed.some((t) => t.ask) || text.split(/\s+/).length > 12) {
         const line = `I couldn't reach my brain just now (${err.message}), so I didn't touch anything. Try again in a moment?`
         say(line)
-        return addChat({ from: 'you', text: said }, { from: 'pokey', text: line })
+        return addChat({ from: 'you', text: said }, { from: 'nudgy', text: line })
       }
-      const found = mockExtract(text)
+      const all = mockExtract(text)
+      const found = all.slice(0, Math.max(0, MAX_OPEN_TASKS - tasks.filter((t) => !t.done).length)).map((t) => ({ ...t, physical: t.physical || looksPhysical(t.title), ...(t.due || t.ask ? {} : { ask: whenAsk(t.title) }) }))
       if (found.length) setLastChange({ before: tasks, points })
       addTasks(found)
-      const line = found.length ? `My brain's offline, so I winged it. ${savedSummary(found)} Check the times.` : 'Nothing to do in there. Just vibes.'
+      const nudge = INTENT_HINT.test(text) ? BACKSTOP : OFFER
+      if (!found.length) setPendingQuestion(nudge)
+      const line = found.length ? `My brain's offline, so I winged it. ${savedSummary(found)} Check the times.${all.length > found.length ? ` ${limitLine(all.length - found.length)}` : ''}` : all.length ? limitLine(all.length) : nudge
       say(line)
-      addChat({ from: 'you', text: said }, { from: 'pokey', text: line, taskIds: found.map((t) => t.id) })
+      addChat({ from: 'you', text: said }, { from: 'nudgy', text: line, taskIds: found.map((t) => t.id) })
     }
   }
 
   const open = tasks.filter((t) => !t.done)
   const done = tasks.filter((t) => t.done)
   const overdue = open.filter(isOverdue).length
-  const latest = pokes[pokes.length - 1]
+  const latest = nudges[nudges.length - 1]
   const latestTask = latest && tasks.find((t) => t.id === latest.taskId)
   const today = new Date().toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' })
   const stats = badgeStats(tasks, streak)
   const next = nextBadge(stats)
   const now = useMinuteClock()
   const upcoming = nextDue(tasks, now)
-  const rail = { open: open.length, overdue, pokes, tasks, next, stats, onRundown: openStory, upcoming, now, day, onPickDay: pickDay }
+  const rail = { open: open.length, overdue, nudges, tasks, next, stats, onRundown: openStory, upcoming, now, day, onPickDay: pickDay }
 
   return (
     <div className="pt-2 lg:grid lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start lg:gap-8">
@@ -504,25 +599,27 @@ export default function HomePage() {
         </button>
       </header>
 
+      <DailyGoals tasks={tasks} onTick={completeTask} />
+
       {/* On phones: a short block up top with nothing to scroll. The rundown button is in the header,
           sound is in the top bar, so that card isn't repeated. */}
       <section aria-label="Your day" className="grid grid-cols-2 gap-3 lg:hidden">
         {next && <NextBadge next={next} stats={stats} className="!px-3" />}
         <Link to="/play" className={`${card} flex flex-col justify-center !p-3 hover:bg-ink/[0.02] ${next ? '' : 'col-span-2'}`}>
-          <span className="text-sm font-semibold">Poke break</span>
+          <span className="text-sm font-semibold">Nudge break</span>
           <span className="text-xs text-ink/50">30-second game</span>
         </Link>
         <div className="col-span-2"><WeekGlance tasks={tasks} day={day} onPickDay={pickDay} /></div>
-        {pokes.length > 0 && (
+        {nudges.length > 0 && (
           <div className={`${card} col-span-2 !py-3`}>
             <div className="flex items-baseline justify-between">
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-ink/45">Recent pokes</h2>
-              <Link to="/pokes" className="text-xs font-semibold text-primary">See all</Link>
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-ink/45">Recent nudges</h2>
+              <Link to="/nudges" className="text-xs font-semibold text-primary">See all</Link>
             </div>
             <ul className="mt-2 space-y-1">
-              {[...pokes].reverse().slice(0, 2).map((p) => (
+              {[...nudges].reverse().slice(0, 2).map((p) => (
                 <li key={p.id}>
-                  <Link to="/pokes" className="-mx-2 flex items-center gap-2 rounded-lg px-2 py-1 hover:bg-ink/5">
+                  <Link to="/nudges" className="-mx-2 flex items-center gap-2 rounded-lg px-2 py-1 hover:bg-ink/5">
                     <BellIcon size={14} className="shrink-0 text-primary" />
                     <span className="truncate text-[13px]">{p.text}</span>
                   </Link>
@@ -543,12 +640,12 @@ export default function HomePage() {
             className="flex items-center gap-3 rounded-2xl border-[length:var(--bw)] border-line bg-soft/60 px-4 py-3"
           >
             <BellIcon size={18} className="shrink-0 text-primary" />
-            <Link to="/pokes" className="min-w-0 flex-1 text-sm leading-snug">{latest.text}</Link>
+            <Link to="/nudges" className="min-w-0 flex-1 text-sm leading-snug">{latest.text}</Link>
             {/* Proof tasks ask first, same as the task card. */}
             {askingProof ? (
               <span className="flex shrink-0 items-center gap-1">
-                <button type="button" onClick={() => { setAskingProof(false); completeTask(latestTask.id) }} className="rounded-full px-2 py-1 text-sm font-semibold text-ink/60 hover:bg-ink/5">
-                  Trust me
+                <button type="button" onClick={() => setAskingProof(false)} className="rounded-full px-2 py-1 text-sm font-semibold text-ink/60 hover:bg-ink/5">
+                  Not now
                 </button>
                 <Link to={`/proof/${latestTask.id}`} className="rounded-full bg-primary px-3 py-1 text-sm font-semibold text-on-primary">Snap +15</Link>
               </span>
@@ -572,7 +669,8 @@ export default function HomePage() {
         about={open.find((t) => t.id === aboutTaskId)}
         onPickAbout={setAboutTaskId}
         thinking={thinking}
-        question={open.find((t) => t.ask)?.ask.text}
+        question={pendingQuestion ?? open.find((t) => t.ask)?.ask.text}
+        onDismissQuestion={pendingQuestion ? () => setPendingQuestion(null) : undefined}
       />
       {(chat.length > 0 || lastChange) && (
         <div className="-mt-2 flex items-center justify-end gap-3">
@@ -602,12 +700,12 @@ export default function HomePage() {
           <p className="py-6 text-center text-ink/50">All clear. Suspiciously productive.</p>
         ) : (
           groupTasks(open).map(([label, list]) => (
-            <TaskGroup key={label} label={label} list={list} now={now} />
+            <TaskGroup key={label} label={label} list={list} />
           ))
         )}
 
         {/* Done always sits last, under Someday, even when empty. */}
-        <TaskGroup label="Done" list={done} now={now} />
+        <TaskGroup label="Done" list={done} collapsed />
         </>
       )}
       </div>

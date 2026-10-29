@@ -1,8 +1,7 @@
 import { useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useStore } from '../lib/store.jsx'
 import Mascot from '../components/Mascot.jsx'
-import { CheckIcon, ChevronIcon } from '../components/Icons.jsx'
+import { CheckIcon } from '../components/Icons.jsx'
 
 const WEEK = 7 * 86400000
 const dayLabel = (iso) => {
@@ -11,10 +10,9 @@ const dayLabel = (iso) => {
   return diff === 0 ? 'Today' : diff === 1 ? 'Yesterday' : d.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'short' })
 }
 
-// Everything said to Pokey, kept on this device, plus how it's going.
+// Everything said to Nudgy, kept on this device, plus how it's going.
 export default function HistoryPage() {
   const { chat, tasks } = useStore()
-  const navigate = useNavigate()
   const end = useRef(null)
 
   useEffect(() => end.current?.scrollIntoView({ block: 'end' }), [])
@@ -36,14 +34,6 @@ export default function HistoryPage() {
   return (
     <div className="flex flex-col gap-4 pt-2">
       <header className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => (window.history.length > 1 ? navigate(-1) : navigate('/'))}
-          aria-label="Back"
-          className="-ml-2 grid h-10 w-10 shrink-0 place-items-center rounded-full text-ink/60 hover:bg-ink/5 hover:text-ink"
-        >
-          <ChevronIcon size={20} className="rotate-90" />
-        </button>
         <div className="min-w-0">
           <h1 className="font-display text-[1.75rem] leading-tight">Our chat</h1>
           <p className="text-sm text-ink/50">

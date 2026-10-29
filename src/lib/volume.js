@@ -1,4 +1,4 @@
-// One volume for every sound Pokey makes: background sound, rundown music, the alarm and the spoken voice.
+// One volume for every sound Nudgy makes: background sound, rundown music, the alarm and the spoken voice.
 // The store keeps the setting; sound modules read it here when they play.
 let level = 0.6
 

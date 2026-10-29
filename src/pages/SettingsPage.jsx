@@ -14,7 +14,7 @@ export default function SettingsPage() {
   useEffect(() => {
     if (window.location.hash === '#account') document.getElementById('account')?.scrollIntoView({ block: 'center' })
   }, [])
-  const { chat, name, setName, theme, setTheme, accents, setAccent, resetDemo, openTutorial, schedule, setSchedule, setIntroSeen, voiceOn, setVoiceOn, say, alarmOn, setAlarmOn } = useStore()
+  const { chat, name, setName, theme, setTheme, accents, setAccent, resetDemo, openTutorial, schedule, setSchedule, setIntroSeen, voiceOn, setVoiceOn, say, alarmOn, setAlarmOn, rundownMode, setRundownMode, buddyName, setBuddyName,  } = useStore()
   const setTime = (key) => (e) => e.target.value && setSchedule((s) => ({ ...s, [key]: e.target.value }))
   const timeField = 'mt-1 w-full rounded-xl border-[length:var(--bw)] border-line bg-bg px-3 py-2 text-base outline-none focus:ring-2 focus:ring-primary'
 
@@ -32,6 +32,25 @@ export default function SettingsPage() {
         />
       </Card>
 
+      <Card>
+        <label htmlFor="buddy" className="text-sm font-medium text-ink/70">What should your Nudgy be called?</label>
+        <input
+          id="buddy"
+          value={buddyName}
+          onChange={(e) => setBuddyName(e.target.value.slice(0, 24))}
+          placeholder="Nudgy"
+          className="mt-2 w-full rounded-xl border-[length:var(--bw)] border-line bg-bg px-3 py-2.5 text-base outline-none focus:ring-2 focus:ring-primary"
+        />
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {name && (
+            <button type="button" onClick={() => setBuddyName(`${name}'s Nudgy`.slice(0, 24))} className="rounded-full bg-ink/5 px-3 py-1.5 text-sm font-semibold text-ink/70 hover:bg-ink/10">
+              Use {name}'s Nudgy
+            </button>
+          )}
+          <button type="button" onClick={() => setBuddyName('Nudgy')} className="rounded-full px-3 py-1.5 text-sm font-semibold text-ink/50 hover:bg-ink/5">Back to Nudgy</button>
+        </div>
+      </Card>
+
       <Card id="account">
         <AccountCard />
       </Card>
@@ -47,7 +66,7 @@ export default function SettingsPage() {
       <Card className="flex items-center justify-between gap-3">
         <span>
           <span className="block font-display text-xl">Alarm sound</span>
-          <span className="block text-sm text-ink/55">A chime when a poke is due, while Pokey is open in any tab.</span>
+          <span className="block text-sm text-ink/55">A chime when a nudge is due, while Nudgy is open in any tab.</span>
           <button type="button" onClick={playAlarm} className="mt-1 text-xs font-semibold text-primary hover:underline">Play it</button>
         </span>
         <input
@@ -61,7 +80,7 @@ export default function SettingsPage() {
 
       <Card>
         <h2 className="font-display text-xl">Background sound</h2>
-        <p className="mt-1 text-sm text-ink/55">Keeps playing softly while you use Pokey.</p>
+        <p className="mt-1 text-sm text-ink/55">Keeps playing softly while you use Nudgy.</p>
         <SoundPicker />
       </Card>
 
@@ -69,14 +88,14 @@ export default function SettingsPage() {
 
       <Card className="flex items-center justify-between gap-3">
         <span>
-          <span className="block font-display text-xl">Pokey talks out loud</span>
+          <span className="block font-display text-xl">Nudgy talks out loud</span>
           <span className="block text-sm text-ink/55">Uses your device's voice. Off means speech bubbles only.</span>
         </span>
         <input
           type="checkbox"
           checked={voiceOn}
           onChange={(e) => { setVoiceOn(e.target.checked); if (e.target.checked) setTimeout(() => say(`Hi ${name || 'friend'}! This is my voice. Fancy, right?`), 50) }}
-          aria-label="Pokey talks out loud"
+          aria-label="Nudgy talks out loud"
           className="h-6 w-6 shrink-0 accent-[var(--primary)]"
         />
       </Card>
@@ -84,7 +103,7 @@ export default function SettingsPage() {
       <Card>
         <h2 className="font-display text-xl">Sleep hours</h2>
         <p className="mt-1 text-sm text-ink/55">
-          I won't poke you about low-priority things while you sleep. Medium and high still get through.
+          I won't nudge you about low-priority things while you sleep. Medium and high still get through.
         </p>
         <div className="mt-3 grid grid-cols-2 gap-2">
           <label className="text-xs font-medium text-ink/60">
@@ -102,8 +121,27 @@ export default function SettingsPage() {
         </label>
       </Card>
 
+      <Card>
+        <h2 className="font-display text-xl">Today's rundown</h2>
+        <p className="mt-1 text-sm text-ink/55">How often it opens by itself. It's always one tap away on Today.</p>
+        <div role="radiogroup" aria-label="How often the rundown opens" className="mt-3 flex flex-wrap gap-1.5">
+          {[['always', 'Every visit'], ['4h', 'Every 4 hours'], ['daily', 'Once a day'], ['never', 'Only when I tap']].map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              role="radio"
+              aria-checked={rundownMode === value}
+              onClick={() => setRundownMode(value)}
+              className={`rounded-full px-3 py-1.5 text-sm font-semibold transition-colors ${rundownMode === value ? 'bg-primary text-on-primary' : 'bg-ink/5 text-ink/70 hover:bg-ink/10'}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </Card>
+
       <section>
-        <h2 className="font-display text-xl">Pokey's personality</h2>
+        <h2 className="font-display text-xl">Nudgy's personality</h2>
         <p className="mb-3 text-sm text-ink/60">Changes the look and the attitude.</p>
         <ul className="grid gap-2 sm:grid-cols-2">
           {THEMES.map((t) => (
@@ -160,7 +198,7 @@ export default function SettingsPage() {
       </section>
 
       <div className="grid grid-cols-2 gap-2">
-        <Button variant="ghost" onClick={openTutorial}>How to use Pokey</Button>
+        <Button variant="ghost" onClick={openTutorial}>How to use Nudgy</Button>
         <Button variant="ghost" onClick={() => setIntroSeen(false)}>Replay the intro</Button>
       </div>
       <Button variant="ghost" onClick={resetDemo}>Clear all my tasks</Button>

@@ -3,20 +3,27 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useStore } from '../lib/store.jsx'
 import Mascot from './Mascot.jsx'
 import { AMBIENT_SOUNDS } from '../lib/ambient.js'
+import { playAlarm, unlockAlarm } from '../lib/alarm.js'
 
 const hasNotify = typeof Notification !== 'undefined'
 const hasMic = typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia
 const hasVoice = typeof window !== 'undefined' && 'speechSynthesis' in window
 
-// "Set Pokey up": sound, notifications and mic, asked on a visit where any is still undecided.
+// "Set Nudgy up": sound, alarm, notifications and mic, asked on a visit where any is still undecided.
 // Browsers only allow these prompts from a tap, so each row has its own Allow button.
 // "Not now" hides the card for this visit; it comes back next visit until everything is decided.
 export default function Permissions() {
-  const { name, setVoiceOn, soundAsked, setSoundAsked, say, storyOpen, setAmbient, ambientAsked, setAmbientAsked } = useStore()
+  const { name, setVoiceOn, soundAsked, setSoundAsked, say, storyOpen, tutorialOpen, setAmbient, ambientAsked, setAmbientAsked, setAlarmOn, alarmAsked, setAlarmAsked } = useStore()
+  // A short beat before the first check, so the rundown (which opens right after the intro) gets the screen first.
+  const [settled, setSettled] = useState(false)
+  useEffect(() => {
+    const id = setTimeout(() => setSettled(true), 900)
+    return () => clearTimeout(id)
+  }, [])
   const [notify, setNotify] = useState(hasNotify ? Notification.permission : 'unsupported')
   const [mic, setMic] = useState(hasMic ? 'unknown' : 'unsupported')
   const [hidden, setHidden] = useState(() => {
-    try { return sessionStorage.getItem('pokey:permsLater') === '1' } catch { return false }
+    try { return sessionStorage.getItem('nudgy:permsLater') === '1' } catch { return false }
   })
 
   useEffect(() => {
@@ -26,12 +33,18 @@ export default function Permissions() {
 
   const rows = [
     hasVoice && !soundAsked && {
-      key: 'sound', icon: '🔊', title: 'Talk out loud', body: 'I read my pokes and replies aloud.',
+      key: 'sound', icon: '🔊', title: 'Talk out loud', body: 'I read my nudges and replies aloud.',
       allow: () => { setVoiceOn(true); setSoundAsked(true); setTimeout(() => say(`Hi ${name || 'friend'}! This is my voice.`), 50) },
       no: () => setSoundAsked(true),
     },
+    !alarmAsked && {
+      key: 'alarm', icon: '⏰', title: 'Alarm sound', body: 'A chime when a nudge is due. Tap Allow to hear it.',
+      // The tap here also unlocks audio, so the chime can play later without one.
+      allow: () => { unlockAlarm(); setAlarmOn(true); setAlarmAsked(true); setTimeout(playAlarm, 50) },
+      no: () => { setAlarmOn(false); setAlarmAsked(true) },
+    },
     notify === 'default' && {
-      key: 'notify', icon: '🔔', title: 'Notifications', body: 'Pokes reach you when you’re in another tab.',
+      key: 'notify', icon: '🔔', title: 'Notifications', body: 'Nudges reach you when you’re in another tab.',
       allow: () => Notification.requestPermission().then(setNotify),
     },
     !ambientAsked && {
@@ -41,7 +54,8 @@ export default function Permissions() {
       no: () => setAmbientAsked(true),
     },
     mic === 'prompt' && {
-      key: 'mic', icon: '🎙️', title: 'Microphone', body: 'Brain-dump by voice. Say "send" when done.',
+      key: 'mic', icon: '🎙️', title: 'Microphone',
+      body: 'Brain-dump by voice. Say "send" when done.',
       allow: () => navigator.mediaDevices.getUserMedia({ audio: true })
         .then((s) => { s.getTracks().forEach((t) => t.stop()); setMic('granted') })
         .catch(() => setMic('denied')),
@@ -50,17 +64,17 @@ export default function Permissions() {
 
   const later = () => {
     setHidden(true)
-    try { sessionStorage.setItem('pokey:permsLater', '1') } catch {}
+    try { sessionStorage.setItem('nudgy:permsLater', '1') } catch {}
   }
 
-  // Waits for the rundown/tutorial to close so two pop-ups never stack.
-  const open = !hidden && rows.length > 0 && !!name && !storyOpen
+  // Order on a visit: intro, then the how-to (first time) or rundown, then this card. Never two at once.
+  const open = settled && !hidden && rows.length > 0 && !!name && !storyOpen && !tutorialOpen
   return (
     <AnimatePresence>
       {open && (
         <motion.div
           role="dialog"
-          aria-label="Set Pokey up"
+          aria-label="Set Nudgy up"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -77,7 +91,7 @@ export default function Permissions() {
               <Mascot size={44} />
               <div>
                 <h2 className="font-display text-xl">Set me up, {name}</h2>
-                <p className="text-sm text-ink/55">A few taps and I can really poke you.</p>
+                <p className="text-sm text-ink/55">A few taps and I can really nudge you.</p>
               </div>
             </div>
             <ul className="mt-4 flex flex-col gap-2">

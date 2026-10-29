@@ -3,10 +3,10 @@
 
 export function deviceId() {
   try {
-    let id = localStorage.getItem('pokey:device')
+    let id = localStorage.getItem('nudgy:device')
     if (!id) {
       id = crypto.randomUUID()
-      localStorage.setItem('pokey:device', id)
+      localStorage.setItem('nudgy:device', id)
     }
     return id
   } catch {
@@ -34,6 +34,8 @@ async function call(path, { method = 'GET', body, session } = {}) {
 
 export const startLogin = (email) => call('/api/auth/start', { method: 'POST', body: { email, deviceId: deviceId(), deviceName: deviceName() } })
 export const submitCode = (pendingId, code) => call('/api/auth/code', { method: 'POST', body: { pendingId, code } })
+// Log in with just the email (no code). Throws with status 404 if there's no such account, 403 if the server wants a code.
+export const directLogin = (email) => call('/api/auth/login', { method: 'POST', body: { email, deviceId: deviceId(), deviceName: deviceName() } })
 export const loginStatus = () => call(`/api/auth/status?deviceId=${encodeURIComponent(deviceId())}`)
 export const logout = (session) => call('/api/auth/logout', { method: 'POST', session })
 export const pullState = (session) => call('/api/sync', { session })

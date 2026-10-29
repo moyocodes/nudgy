@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useStore } from '../lib/store.jsx'
 import { friendlyDue, isEarly, isOverdue } from '../lib/format.js'
-import { canPoke, describeRepeat, formatClock, nextOccurrence } from '../lib/schedule.js'
+import { canNudge, describeRepeat, formatClock, nextOccurrence } from '../lib/schedule.js'
 import { PriorityBadge, ProofBadge } from './ui.jsx'
 import DatePicker from './DatePicker.jsx'
 import RepeatPicker from './RepeatPicker.jsx'
@@ -35,7 +35,7 @@ function TaskEditor({ task, onClose }) {
   // A date with no time defaults to 9 AM; a time with no date means today.
   // A repeating task's due is simply its next slot.
   const due = repeat ? nextOccurrence(repeat) : date || time ? new Date(`${date || dayString(0)}T${time || '09:00'}`) : null
-  const asleep = due && priority === 'low' && !canPoke({ priority }, due, schedule)
+  const asleep = due && priority === 'low' && !canNudge({ priority }, due, schedule)
 
   function save(e) {
     e.preventDefault()
@@ -80,8 +80,8 @@ function TaskEditor({ task, onClose }) {
         {!due
           ? `No date: I'll nudge you at ${formatClock(schedule.checkIn)} each day.`
           : asleep
-            ? `That's during your sleep hours, so I'll wait until ${formatClock(schedule.sleepEnd)}. Make it medium or high to poke you anyway.`
-            : `I'll poke you ${friendlyDue(due.toISOString()).toLowerCase()}${repeat ? `, then ${describeRepeat(repeat).toLowerCase()}` : ''}.`}
+            ? `That's during your sleep hours, so I'll wait until ${formatClock(schedule.sleepEnd)}. Make it medium or high to nudge you anyway.`
+            : `I'll nudge you ${friendlyDue(due.toISOString()).toLowerCase()}${repeat ? `, then ${describeRepeat(repeat).toLowerCase()}` : ''}.`}
       </p>
       <div className="flex items-center gap-2">
         <button type="button" onClick={() => (isEarly(task) && !sureDelete ? setSureDelete(true) : deleteTask(task.id))} className="mr-auto rounded-full px-2 py-1.5 text-sm font-semibold text-accent hover:bg-ink/5">
@@ -104,7 +104,7 @@ function AskRow({ task, onPick }) {
   function saveAnswer(text) {
     const changes = ['how', 'why'].includes(task.ask.kind) ? { note: text } : { title: `${task.title} (${text})` }
     updateTask(task.id, { ...changes, ask: null })
-    addChat({ from: 'pokey', text: task.ask.text }, { from: 'you', text })
+    addChat({ from: 'nudgy', text: task.ask.text }, { from: 'you', text })
   }
   const at = (days, h) => {
     const d = new Date()
@@ -114,7 +114,7 @@ function AskRow({ task, onPick }) {
   }
   const setWhen = (due) => {
     updateTask(task.id, { due, ask: null })
-    addChat({ from: 'pokey', text: task.ask.text }, { from: 'you', text: friendlyDue(due) })
+    addChat({ from: 'nudgy', text: task.ask.text }, { from: 'you', text: friendlyDue(due) })
   }
   const chip = 'min-h-8 rounded-full bg-surface px-3 text-xs font-semibold ring-1 ring-line hover:bg-ink/5'
 
@@ -147,11 +147,11 @@ function AskRow({ task, onPick }) {
 }
 
 export default function TaskCard({ task }) {
-  const { completeTask, reopenTask, deleteTask, pokes, schedule, aboutTaskId, setAboutTaskId } = useStore()
+  const { completeTask, reopenTask, deleteTask, nudges, schedule, aboutTaskId, setAboutTaskId } = useStore()
   const [editing, setEditing] = useState(false)
   const [asking, setAsking] = useState(false)
   const navigate = useNavigate()
-  const poked = pokes.filter((p) => p.taskId === task.id).length
+  const nudged = nudges.filter((p) => p.taskId === task.id).length
   // Ticking off something not due yet asks "sure?" first; then the usual photo-proof question.
   const [early, setEarly] = useState(false)
   const finish = () => { setEarly(false); task.physical ? setAsking(true) : completeTask(task.id) }
@@ -211,9 +211,9 @@ export default function TaskCard({ task }) {
           </button>
           {!task.done && <PriorityBadge priority={task.priority} />}
           {task.repeat && <span className="truncate text-xs text-ink/50" title={describeRepeat(task.repeat)}>↻ {describeRepeat(task.repeat)}</span>}
-          {!task.done && poked > 0 && (
-            <Link to="/pokes" className="inline-flex items-center gap-1 text-xs text-ink/50 hover:text-primary">
-              <BellIcon size={12} /> {poked}×
+          {!task.done && nudged > 0 && (
+            <Link to="/nudges" className="inline-flex items-center gap-1 text-xs text-ink/50 hover:text-primary">
+              <BellIcon size={12} /> {nudged}×
             </Link>
           )}
         </div>
@@ -248,13 +248,13 @@ export default function TaskCard({ task }) {
       >
         <PencilIcon size={16} />
       </button>
-      {/* @: talk to Pokey about this one; it lands as a chip in the brain dump. */}
+      {/* @: talk to Nudgy about this one; it lands as a chip in the brain dump. */}
       {!task.done && (
         <button
           type="button"
           onClick={() => setAboutTaskId(task.id)}
-          aria-label={`Tell Pokey what to do with ${task.title}`}
-          title="Tell Pokey what to do with this"
+          aria-label={`Tell Nudgy what to do with ${task.title}`}
+          title="Tell Nudgy what to do with this"
           className={`grid h-8 w-8 place-items-center rounded-full text-[15px] font-semibold hover:bg-ink/5 ${aboutTaskId === task.id ? 'text-primary' : 'text-ink/40 hover:text-ink'}`}
         >
           @
@@ -273,7 +273,7 @@ export default function TaskCard({ task }) {
       </div>
       </>
       )}
-      {/* Pokey's follow-up question when the model couldn't tell when/who/what. */}
+      {/* Nudgy's follow-up question when the model couldn't tell when/who/what. */}
       {task.ask && !task.done && !editing && <AskRow task={task} onPick={() => setEditing(true)} />}
       {early && !task.done && (
         <div className="mt-2 flex basis-full flex-wrap items-center gap-2 border-t-[length:var(--bw)] border-line pt-3">
@@ -293,9 +293,9 @@ export default function TaskCard({ task }) {
             className="basis-full"
           >
             <div className="mt-2 flex flex-wrap items-center gap-2 border-t-[length:var(--bw)] border-line pt-3">
-              <span className="mr-auto text-sm font-medium">Pics or it didn't happen?</span>
-              <button type="button" onClick={() => { setAsking(false); completeTask(task.id) }} className="min-h-9 rounded-full px-3 text-sm font-semibold text-ink/60 hover:bg-ink/5">
-                Just trust me
+              <span className="mr-auto text-sm font-medium">Photo proof needed. Pics or it didn't happen.</span>
+              <button type="button" onClick={() => setAsking(false)} className="min-h-9 rounded-full px-3 text-sm font-semibold text-ink/60 hover:bg-ink/5">
+                Not now
               </button>
               <button type="button" onClick={() => navigate(`/proof/${task.id}`)} className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-primary px-3 text-sm font-semibold text-on-primary">
                 <CameraIcon size={15} /> Snap it +15

@@ -6,13 +6,13 @@ import { Button } from '../components/ui.jsx'
 import Mascot from '../components/Mascot.jsx'
 import { CameraIcon } from '../components/Icons.jsx'
 
-// Whack-a-poke: a 30-second poke break. Excuses pop up out of nine holes; poke them before
-// they duck. Your tasks that want photo proof sneak in too: poke one and it goes on the
+// Whack-a-nudge: a 30-second nudge break. Distractions pop up out of nine holes; nudge them before
+// they duck. Your tasks that want photo proof sneak in too: nudge one and it goes on the
 // "snap these" list shown at the end. The game nudges; the photo is still what counts.
 
 const ROUND_MS = 30000
-const EXCUSES = ['5 more mins', 'later', 'tomorrow-ish', 'after this episode', 'snacks first', 'Monday', 'too tired', "it's raining", 'one more scroll', 'vibes off']
-const BEST_KEY = 'pokey:bestPoke'
+const DISTRACTIONS = ['5 more mins', 'later', 'tomorrow-ish', 'after this episode', 'snacks first', 'Monday', 'too tired', "it's raining", 'one more scroll', 'vibes off']
+const BEST_KEY = 'nudgy:bestNudge'
 
 // A short low "bzzt" for a miss, made with Web Audio so there's no sound file to load.
 let audio
@@ -58,7 +58,7 @@ function MissRecap({ misses }) {
       </div>
       <p className="text-left text-sm">
         <span className="block text-3xl font-black leading-none text-accent">{total}✕</span>
-        <span className="text-ink/55">{total === 0 ? 'Zero misses. Surgical.' : total < 5 ? 'A few wild pokes.' : 'Poking the air a lot there.'}</span>
+        <span className="text-ink/55">{total === 0 ? 'Zero misses. Surgical.' : total < 5 ? 'A few wild nudges.' : 'Nudging the air a lot there.'}</span>
       </p>
     </div>
   )
@@ -101,7 +101,7 @@ export default function PlayPage() {
     const began = performance.now() - elapsedRef.current
     let spawnTimer
 
-    // Starts gentle and ramps up: a pop every 1.4s with 2s to poke it, down to every 0.5s with 0.8s.
+    // Starts gentle and ramps up: a pop every 1.4s with 2s to nudge it, down to every 0.5s with 0.8s.
     const spawn = () => {
       const elapsed = performance.now() - began
       const ramp = Math.min(1, elapsed / ROUND_MS)
@@ -112,7 +112,7 @@ export default function PlayPage() {
         const waiting = proofTasks.filter((t) => !got.includes(t.id) && !now.some((h) => h?.taskId === t.id))
         const target = waiting.length && Math.random() < 0.22
           ? (({ id, title, photo }) => ({ kind: 'task', label: title, taskId: id, photo }))(pick(waiting))
-          : { kind: 'excuse', label: pick(EXCUSES) }
+          : { kind: 'distraction', label: pick(DISTRACTIONS) }
         const life = 2000 - 1200 * ramp
         setHoles((hs) => hs.map((h, i) => (i === spot ? { ...target, id: Math.random(), until: Date.now() + life } : h)))
       }
@@ -144,14 +144,14 @@ export default function PlayPage() {
   useEffect(() => {
     if (phase !== 'over') return
     setHoles(Array(9).fill(null))
-    say(score > best && score > 0 ? `${score}! New personal best. Fingers of steel.` : `${score} pokes. Not bad. Not legendary. Yet.`)
+    say(score > best && score > 0 ? `${score}! New personal best. Fingers of steel.` : `${score} nudges. Not bad. Not legendary. Yet.`)
     if (score > best) {
       setBest(score)
       try { localStorage.setItem(BEST_KEY, String(score)) } catch {}
     }
   }, [phase]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  function poke(i) {
+  function nudge(i) {
     const h = holes[i]
     if (phase !== 'playing') return
     if (!h) {
@@ -178,8 +178,8 @@ export default function PlayPage() {
     <div className="flex flex-col gap-4 pt-2">
       <header className="flex items-end justify-between gap-3">
         <div>
-          <h1 className="font-display text-[1.75rem] leading-tight">Poke break</h1>
-          <p className="text-sm text-ink/50">30 seconds. Poke the excuses before they hide.</p>
+          <h1 className="font-display text-[1.75rem] leading-tight">Nudge break</h1>
+          <p className="text-sm text-ink/50">30 seconds. Nudge the distractions before they hide.</p>
         </div>
         <div className="text-right">
           <p className="font-display text-3xl leading-none">{score}</p>
@@ -197,8 +197,8 @@ export default function PlayPage() {
             <button
               key={i}
               type="button"
-              onPointerDown={() => poke(i)}
-              aria-label={h ? `Poke ${h.label}` : 'Empty'}
+              onPointerDown={() => nudge(i)}
+              aria-label={h ? `Nudge ${h.label}` : 'Empty'}
               className="relative aspect-square overflow-hidden rounded-2xl border-[length:var(--bw)] border-line bg-ink/[0.04]"
             >
               <span className="absolute inset-x-3 bottom-3 h-3 rounded-full bg-ink/10" />
@@ -256,29 +256,29 @@ export default function PlayPage() {
             transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
             className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-2xl bg-bg/90 p-5 text-center backdrop-blur-sm"
           >
-            <Mascot size={56} poking={phase === 'ready'} />
+            <Mascot size={56} nudging={phase === 'ready'} />
             {phase === 'resting' ? (
               <>
                 <p className="font-display text-2xl leading-tight">Tired yet? <em>{score} so far.</em></p>
                 <p className="text-sm text-ink/60">It only gets faster from here.</p>
                 <div className="flex gap-2">
                   <Button variant="ghost" onClick={() => setPhase('over')}>I'm done</Button>
-                  <Button onClick={() => setPhase('playing')}>Keep poking</Button>
+                  <Button onClick={() => setPhase('playing')}>Keep nudging</Button>
                 </div>
               </>
             ) : phase === 'ready' ? (
               <>
                 <p className="text-sm text-ink/60">
-                  Excuses are +1.{proofTasks.length > 0 && ' Your proof tasks are +3, and I\'ll line them up for a photo after.'}
+                  Distractions are +1.{proofTasks.length > 0 && ' Your proof tasks are +3, and I\'ll line them up for a photo after.'}
                 </p>
-                <Button onClick={start} disabled={!canAfford}>Start poking · {GAME_COST} coins</Button>
+                <Button onClick={start} disabled={!canAfford}>Start nudging · {GAME_COST} coins</Button>
                 {!canAfford && <p className="text-xs text-ink/50">You have {points}. Finish a task to earn 10.</p>}
               </>
             ) : (
               <>
                 <MissRecap misses={misses} />
                 <p className="font-display text-2xl leading-tight">
-                  {score} {score === 1 ? 'poke' : 'pokes'}.{' '}
+                  {score} {score === 1 ? 'nudge' : 'nudges'}.{' '}
                   <em>{score >= best && score > 0 ? 'New best.' : score > 20 ? 'Ruthless.' : 'Warming up.'}</em>
                 </p>
                 <Button onClick={start} disabled={!canAfford}>Again · {GAME_COST} coins</Button>
@@ -290,7 +290,7 @@ export default function PlayPage() {
 
       {phase === 'over' && caughtTasks.length > 0 && (
         <section className="rounded-2xl border-[length:var(--bw)] border-line bg-surface p-4 shadow-card">
-          <h2 className="font-display text-xl">You poked these. Snap them?</h2>
+          <h2 className="font-display text-xl">You nudged these. Snap them?</h2>
           <p className="text-sm text-ink/55">Pics or it didn't happen. +15 each.</p>
           <ul className="mt-3 space-y-2">
             {caughtTasks.map((t) => (

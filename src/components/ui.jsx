@@ -40,19 +40,20 @@ export function PriorityBadge({ priority }) {
   )
 }
 
-// Whether a proof photo has been claimed for points yet. Compact = just the icon dot, for thumbnails.
+// "Complete" badge for a proof photo. Compact = just the tick, for thumbnails.
 export function ProofBadge({ complete, compact = false, className = '' }) {
-  const colour = complete ? 'bg-success text-on-primary' : 'bg-highlight text-ink'
+  // Only ever says "Complete"; there is no "Incomplete" state. Without proof, nothing is shown.
+  if (!complete) return null
   if (compact) {
     return (
-      <span title={complete ? 'Proof complete' : 'Proof incomplete'} className={`grid h-4 w-4 place-items-center rounded-full text-[10px] font-bold ring-2 ring-surface ${colour} ${className}`}>
-        {complete ? <CheckIcon size={10} strokeWidth={3} /> : '!'}
+      <span title="Proof complete" className={`grid h-4 w-4 place-items-center rounded-full bg-success text-on-primary ring-2 ring-surface ${className}`}>
+        <CheckIcon size={10} strokeWidth={3} />
       </span>
     )
   }
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold shadow-card ${colour} ${className}`}>
-      {complete ? <><CheckIcon size={12} strokeWidth={2.5} /> Complete</> : 'Incomplete'}
+    <span className={`inline-flex items-center gap-1 rounded-full bg-success px-2.5 py-1 text-xs font-semibold text-on-primary shadow-card ${className}`}>
+      <CheckIcon size={12} strokeWidth={2.5} /> Complete
     </span>
   )
 }

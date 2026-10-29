@@ -1,6 +1,8 @@
-# Pokey
+# Nudgy
 
-**The reminder app that pokes back.** Dump everything on your mind, messy, by voice or text. Pokey turns it into tidy reminders, then nudges you, cheekily and with escalating drama, until each one is done.
+**Nudgy is the reminder app that nudges back.** Say or type everything on your mind: Muse Spark turns it into reminders, asks follow-up questions, and nudges you until it's done. Voice by Muse Voice Transcribe, photo proof checked by SAM 3.1, personal badges by Muse Image.
+
+Dump everything on your mind, messy, by voice or text. Nudgy turns it into tidy reminders, then nudges you, cheekily and with escalating drama, until each one is done.
 
 Built from scratch for the Meta Global AI Developer Hackathon, Oct 26 – Nov 4, 2026. 60-second walkthrough: [DEMO.md](DEMO.md).
 
@@ -8,14 +10,14 @@ Built from scratch for the Meta Global AI Developer Hackathon, Oct 26 – Nov 4,
 
 - **Messy in, tidy out.** "ugh dentist?? oat milk. yinka's tmrw like 5pm" becomes three reminders with times. Muse Spark fixes typos and mishearings, works out dates, priorities and repeats ("every weekday at 8"), and asks a short, punny question when something essential is missing.
 - **It knows your list.** "I called mum", "move the gym to 7" or "cancel the dentist" act on the existing reminder instead of adding a duplicate. Tap **@** on a reminder to give it instructions directly. "Undo" reverses the last change.
-- **Pokes until it's done.** Due reminders get a fresh, model-written line every hour, escalating from Nudge to Shove, until you tap Done or Snooze. Sleep hours hold back low-priority pokes. Pokes show as browser notifications when the tab is in the background.
-- **Pics or it didn't happen.** Errands can ask for a photo when you tick them off, for +15 points.
-- **Calm mode.** Say you're swamped and the list folds down to the one thing that matters most, with a 30-second poke-break game.
+- **Nudges until it's done.** Due reminders get a fresh, model-written line every hour, escalating from Nudge to Shove, until you tap Done or Snooze. Sleep hours hold back low-priority nudges. Nudges show as browser notifications when the tab is in the background.
+- **Pics or it didn't happen.** Errands marked as photo proof can't be ticked off without a photo, and earn +15 points.
+- **Calm mode.** Say you're swamped and the list folds down to the one thing that matters most, with a 30-second nudge-break game.
 - **Rewards.** Points, streaks and badges.
 - **Every device.** Log in with just your email (each new device is confirmed by an emailed link or code), and tasks, chat and points sync.
 - **Four personalities.** Chill, Cheeky, Sassy and Night owl themes, each with its own font, look and colour choices.
 
-Pokey is always warm and punny. Never flirty, never mean, never medical.
+Nudgy is always warm and punny. Never flirty, never mean, never medical.
 
 ## How the AI is used
 
@@ -23,9 +25,9 @@ Pokey is always warm and punny. Never flirty, never mean, never medical.
 |---|---|---|
 | Voice brain-dump | Muse Voice Transcribe (live, streamed through the server) | You tap the mic |
 | Turning a dump into reminders and actions | Muse Spark | You press Add tasks / Enter |
-| Poke lines | Muse Spark | A poke is actually due, or you tap Poke me |
+| Nudge lines | Muse Spark | A nudge is actually due, or you tap Nudge me |
 
-Model output is never trusted blindly. The server drops tasks with no title, turns an unreadable time into a "when?" question, ignores actions that point at reminders that don't exist, and Pokey's confirmation ("Set: Call mum, today 6 PM") is built from what was really saved, so it can't claim a reminder it didn't make. If a call fails, a local parser and canned pokes keep the app working.
+Model output is never trusted blindly. The server drops tasks with no title, turns an unreadable time into a "when?" question, ignores actions that point at reminders that don't exist, and Nudgy's confirmation ("Set: Call mum, today 6 PM") is built from what was really saved, so it can't claim a reminder it didn't make. If a call fails, a local parser and canned nudges keep the app working.
 
 ## Tech
 
@@ -48,14 +50,14 @@ Model output is never trusted blindly. The server drops tasks with no title, tur
 ## Project layout
 
 ```
-server/index.js           Model routes: /api/extract, /api/poke; voice relay /api/asr
+server/index.js           Model routes: /api/extract, /api/nudge; voice relay /api/asr
 server/auth.js            Email device login and sync
-src/pages/                Landing, Today, Pokes, Rewards, Me, chat history, photo proof, login
-src/components/           Brain dump, task card, poke scheduler, repeat picker, mascot, story…
-src/lib/                  Store, schedule and repeat maths, pokes, themes, account calls
+src/pages/                Landing, Today, Nudges, Rewards, Me, chat history, photo proof, login
+src/components/           Brain dump, task card, nudge scheduler, repeat picker, mascot, story…
+src/lib/                  Store, schedule and repeat maths, nudges, themes, account calls
 NOTES.md                  Dev log, one entry per feature
 ```
 
 ## Cost rules
 
-Every model call costs money, so the API is called only when you tap a button or a poke is actually due, never on page load or while typing. Outputs are capped (1000 tokens for pokes, 2000 for extraction, since Muse Spark's reasoning alone used up the earlier 300 and 800), reasoning effort is low, identical dumps are cached, and the server logs model and token counts per call.
+Every model call costs money, so the API is called only when you tap a button or a nudge is actually due, never on page load or while typing. Outputs are capped (1000 tokens for nudges, 2000 for extraction, since Muse Spark's reasoning alone used up the earlier 300 and 800), reasoning effort is low, identical dumps are cached, and the server logs model and token counts per call.
