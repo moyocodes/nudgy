@@ -6,7 +6,7 @@ import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 
-const DB_FILE = process.env.POKEY_DB || path.join(import.meta.dirname, 'data', 'db.json')
+const DB_FILE = process.env.NUDGY_DB || path.join(import.meta.dirname, 'data', 'db.json')
 const CODE_TTL_MS = 15 * 60 * 1000
 const RESEND_GAP_MS = 60 * 1000
 
@@ -23,6 +23,10 @@ function save() {
   fs.writeFileSync(DB_FILE, JSON.stringify(db))
 }
 
+// A fixed code for demos. On when no email service is connected (nobody could receive a real one), or when
+// DEMO_CODE is set. Set DEMO_CODE= (empty) to switch it off. Real emails still work either way.
+const demoCode = () => (process.env.DEMO_CODE !== undefined ? process.env.DEMO_CODE.trim() : process.env.RESEND_API_KEY ? '' : '123456')
+
 const token = () => crypto.randomBytes(24).toString('base64url')
 const validEmail = (e) => typeof e === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) && e.length < 200
 
@@ -35,10 +39,10 @@ async function sendEmail(to, link, code) {
     method: 'POST',
     headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      from: process.env.EMAIL_FROM || 'Pokey <onboarding@resend.dev>',
+      from: process.env.EMAIL_FROM || 'Nudgy <onboarding@resend.dev>',
       to,
-      subject: `Your Pokey code: ${code}`,
-      text: `Someone (hopefully you) wants to use Pokey on a new device.\n\nConfirm it: ${link}\nOr type this code: ${code}\n\nNot you? Ignore this and nothing happens.`,
+      subject: `Your Nudgy code: ${code}`,
+      text: `Someone (hopefully you) wants to use Nudgy on a new device.\n\nConfirm it: ${link}\nOr type this code: ${code}\n\nNot you? Ignore this and nothing happens.`,
     }),
   })
   if (!r.ok) throw new Error(`Email failed: ${r.status} ${await r.text()}`)
@@ -77,7 +81,7 @@ export function mountAuth(app) {
     const link = `${req.get('origin') || `http://${req.get('host')}`}/api/auth/confirm?t=${id}`
     try {
       await sendEmail(email, link, code)
-      res.json({ pendingId: id })
+      res.json({ pendingId: id, demoCode: demoCode() || undefined })
     } catch (err) {
       console.error('[auth]', err.message)
       delete db.pending[id]
@@ -86,11 +90,33 @@ export function mountAuth(app) {
     }
   })
 
+  // Log in: an email that already has an account gets in right away, no code. This is for the hackathon demo; it
+  // means anyone who knows an email can open that account. Set REQUIRE_LOGIN_CODE=true to ask for the emailed
+  // code on login too (the client then falls back to the code flow).
+  const loginTries = new Map()
+  app.post('/api/auth/login', (req, res) => {
+    const email = String(req.body?.email ?? '').trim().toLowerCase()
+    const { deviceId, deviceName } = req.body ?? {}
+    if (!validEmail(email) || typeof deviceId !== 'string' || deviceId.length > 100) return res.status(400).json({ error: 'Check that email' })
+    if (process.env.REQUIRE_LOGIN_CODE === 'true') return res.status(403).json({ error: 'A code is needed', needsCode: true })
+    // A little brake on guessing emails: 10 tries a minute per email.
+    const now = Date.now()
+    const recent = (loginTries.get(email) ?? []).filter((t) => now - t < 60000)
+    if (recent.length >= 10) return res.status(429).json({ error: 'Too many tries. Wait a minute.' })
+    loginTries.set(email, [...recent, now])
+
+    const exists = !!db.data[email] || Object.values(db.devices).some((d) => d.verified && d.email === email)
+    if (!exists) return res.status(404).json({ error: "I don't know that email. Sign up instead?" })
+    db.devices[deviceId] = { email, name: String(deviceName ?? 'A device').slice(0, 60), verified: true, session: token(), confirmedAt: now, lastSeen: now }
+    save()
+    res.json({ email, session: db.devices[deviceId].session })
+  })
+
   // Step 2a: the link in the email.
   app.get('/api/auth/confirm', (req, res) => {
     const ok = confirm(String(req.query.t ?? ''))
     res.type('html').send(`<!doctype html><meta name="viewport" content="width=device-width"><body style="font-family:system-ui;display:grid;place-items:center;min-height:90vh;text-align:center">
-      <div><h1>${ok ? 'Device confirmed 👉' : 'That link has expired'}</h1><p>${ok ? 'Head back to Pokey on that device. It signs itself in.' : 'Ask Pokey for a new one.'}</p></div>`)
+      <div><h1>${ok ? 'Device confirmed 👉' : 'That link has expired'}</h1><p>${ok ? 'Head back to Nudgy on that device. It signs itself in.' : 'Ask Nudgy for a new one.'}</p></div>`)
   })
 
   // Step 2b: or the 6-digit code typed into the app.
@@ -103,7 +129,8 @@ export function mountAuth(app) {
       save()
       return res.status(429).json({ error: 'Too many tries. Send a new code.' })
     }
-    if (String(code).trim() !== p.code) {
+    const demo = demoCode()
+    if (String(code).trim() !== p.code && !(demo && String(code).trim() === demo)) {
       save()
       return res.status(400).json({ error: "That's not the code. Close, maybe?" })
     }

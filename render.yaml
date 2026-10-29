@@ -4,7 +4,7 @@
 # their own copy and re-sync after logging in again.
 services:
   - type: web
-    name: pokey
+    name: nudgy
     runtime: node
     plan: free
     buildCommand: npm ci --include=dev && npm run build

@@ -6,6 +6,8 @@ import express from 'express'
 import OpenAI from 'openai'
 import { WebSocket, WebSocketServer } from 'ws'
 import { mountAuth } from './auth.js'
+import { findInPhoto } from './sam.js'
+import { BADGE_IDS, badgePrompt, generateImage } from './image.js'
 
 const app = express()
 // Synced state carries small photo thumbnails, so allow more than the 100kb default.
@@ -46,22 +48,40 @@ app.post('/api/test', async (_req, res) => {
   }
 })
 
-// Brain-dump -> tasks plus a one-line reply in Pokey's voice.
+// Brain-dump -> tasks plus a one-line reply in Nudgy's voice.
 // Only called when the user presses Add tasks / Enter. Same text on the same day is served from cache.
-const EXTRACT_PROMPT = `You are Pokey, a cheeky, warm reminder buddy (never flirty, mean or medical). Input may be messy speech-to-text; work out what they mean.
+const EXTRACT_PROMPT = `You are Nudgy, a cheeky, warm reminder buddy (never flirty, mean or medical). Input may be messy speech-to-text; work out what they mean.
 Return ONLY compact JSON, omitting null/false/empty fields:
-{"reply":str,"mood"?:"overwhelmed","actions"?:[{"type":"done"|"delete"|"snooze"|"update"|"undo","n":num,"due"?,"title"?,"priority"?,"repeat"?}],"tasks"?:[{"title":str,"due"?,"priority":"low"|"medium"|"high","proof"?:true,"ask"?:{"kind":"when"|"who"|"what"|"how"|"why","text":str},"repeat"?:[{"days":[0-6],"time":"HH:mm"}]}]}
-- Only items in tasks/actions get saved. Each new reminder is one task.
+{"reply":str,"followup"?:str,"mood"?:"overwhelmed","actions"?:[{"type":"done"|"delete"|"snooze"|"update"|"undo","n":num,"due"?,"title"?,"priority"?,"repeat"?,"proof"?,"proofOf"?}],"tasks"?:[{"title":str,"due"?,"priority":"low"|"medium"|"high","proof"?:true,"proofOf"?:str,"ask"?:{"kind":"when"|"who"|"what"|"how"|"why","text":str},"repeat"?:[{"days":[0-6],"time":"HH:mm"}]}]}
+- Only items in tasks/actions get saved. Scan the whole text for EVERY possible reminder (tasks, errands, appointments, deadlines, commitments, things to remember, even implied ones like "mum's birthday Friday"); each is its own task, never merged or dropped. If something might be a reminder but is unclear, or nothing was saved and it isn't chit-chat, set followup: one short punny question asking what or when. If there is no reminder in it at all and it isn't chit-chat, say so plainly in reply ("I couldn't find a reminder in that") and set followup offering one ("Want me to set a reminder about something?").
 - reminders: user's open list, numbered. Text about one (done, cancel, move, rename, snooze) = action with its n, never a duplicate task. "undo" = {"type":"undo"}. [asked: …] = waiting on your question; an answer = update actions (due, or title for who/what). selected = text is instructions for that n. "split into X and Y" = delete + 2 tasks.
-- recent chat is context only; don't re-add from it. Greetings or chat ("hey Pokey", "thanks") are not tasks; just reply.
-- title: short imperative, filler dropped, mishearings fixed. due: local "YYYY-MM-DDTHH:mm" from now; bare 1-6 = PM; a shared time applies to joined tasks. priority: high if urgent, low if "maybe", else medium.
+- recent chat is context only; don't re-add from it. Greetings or chat ("hey Nudgy", "thanks") are not tasks; just reply.
+- title: short imperative, filler dropped, mishearings fixed. due: local "YYYY-MM-DDTHH:mm" from now, taking any weekday or date from the calendar (never work it out yourself); if the weekday and date they give disagree, ask which they meant instead of guessing; bare 1-6 = PM; a shared time applies to joined tasks. priority: high if urgent, low if "maybe", else medium.
 - repeat: recurring only; days 0=Sun; no time = one daily time (due, else 09:00); due = next slot. repeat:null in an update stops it.
-- proof: physical errands a photo could prove.
+- proof: true when finishing means being somewhere or leaves something to photograph: buying or picking up an item, cleaning, tidying, packing, cooking, fixing, posting a parcel, going to a place or an appointment, attending or joining a meeting or event. Not for calls, messages, emails, online payments, bookings, decisions or things to remember. proofOf: the short noun phrase the photo should show ("oat milk carton", "meeting room"). In an update action, proof true or false (with proofOf) when they ask for a photo on a reminder or drop it.
 - ask: one short punny question only if essential info is missing; don't ask what you can infer.
 - mood overwhelmed: stressed/swamped/wants things cleared. Then reply gently says the list is folded to one thing.
-- reply: one witty sentence using their name; never list tasks or claim you saved anything.`
+- reply: one witty sentence using their name, never labelling them; never list tasks or claim you saved anything.`
 
 const extractCache = new Map()
+
+// What the user calls their Nudgy ("Moyo's Nudgy"): plain words only, so it can't smuggle instructions in.
+const cleanBuddy = (b) => String(b ?? '').replace(/["\\\n\r]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 24)
+const withBuddy = (prompt, buddy) => (buddy && buddy !== 'Nudgy' ? prompt.replace('You are Nudgy', `You are Nudgy, whom the user calls "${buddy}"`) : prompt)
+
+// Models are bad at weekday arithmetic, so when the text mentions a day or date we hand over a calendar.
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const DATE_WORDS = /\b(mon|tue|wed|thu|fri|sat|sun|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b|\b\d{1,2}(st|nd|rd|th)\b|\bnext\b/i
+function calendarFor(now) {
+  const base = new Date(`${String(now).slice(0, 10)}T12:00:00`)
+  if (isNaN(base)) return { weekday: '', calendar: '' }
+  const calendar = Array.from({ length: 21 }, (_, i) => {
+    const d = new Date(base)
+    d.setDate(d.getDate() + i)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${DAYS[d.getDay()]}`
+  }).join(', ')
+  return { weekday: DAYS[base.getDay()], calendar }
+}
 const ASK_KINDS = ['when', 'who', 'what', 'how', 'why']
 
 // The model's output is only trusted after this: no title means no task, and a due that
@@ -71,8 +91,8 @@ function cleanTask(t) {
   if (!title) return null
   const due = typeof t.due === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(t.due) && !isNaN(new Date(t.due)) ? t.due.slice(0, 16) : null
   let ask = t.ask?.text ? { kind: ASK_KINDS.includes(t.ask.kind) ? t.ask.kind : 'what', text: String(t.ask.text) } : null
-  if (t.due && !due && !ask) ask = { kind: 'when', text: `When should I poke you about "${title}"? I lost the time somewhere.` }
-  return { title, due, priority: ['low', 'medium', 'high'].includes(t.priority) ? t.priority : 'medium', proof: !!t.proof, ask, repeat: cleanRepeat(t.repeat) }
+  if (t.due && !due && !ask) ask = { kind: 'when', text: `When should I nudge you about "${title}"? I lost the time somewhere.` }
+  return { title, due, priority: ['low', 'medium', 'high'].includes(t.priority) ? t.priority : 'medium', proof: !!t.proof, proofOf: t.proof && typeof t.proofOf === 'string' ? t.proofOf.trim().slice(0, 60) : '', ask, repeat: cleanRepeat(t.repeat) }
 }
 
 // Actions on existing reminders: known types only, n must point at a listed reminder.
@@ -89,6 +109,10 @@ function cleanActions(actions, count) {
       if (['low', 'medium', 'high'].includes(a.priority)) changes.priority = a.priority
       // repeat: slots to start/change repeating, null to stop; absent means leave it alone.
       if ('repeat' in a) changes.repeat = cleanRepeat(a.repeat)
+      if (typeof a.proof === 'boolean') {
+        changes.proof = a.proof
+        if (a.proof && typeof a.proofOf === 'string' && a.proofOf.trim()) changes.proofOf = a.proofOf.trim().slice(0, 60)
+      }
       return { type: 'update', n: a.n, ...changes }
     })
     .filter((a) => a.type !== 'update' || Object.keys(a).length > 2)
@@ -108,6 +132,7 @@ function cleanRepeat(repeat) {
 
 app.post('/api/extract', async (req, res) => {
   const { text, now, name, history, reminders, selected } = req.body ?? {}
+  const buddy = cleanBuddy(req.body?.buddy)
   if (!text?.trim()) return res.status(400).json({ error: 'No text' })
   const model = process.env.MODEL_NAME
   if (!model || !process.env.MODEL_API_KEY) {
@@ -117,7 +142,7 @@ app.post('/api/extract', async (req, res) => {
   // The last few messages, trimmed, so follow-ups make sense without resending the whole chat.
   const recent = (Array.isArray(history) ? history : [])
     .slice(-4)
-    .map((m) => `${m?.from === 'you' ? 'user' : 'pokey'}: ${String(m?.text ?? '').slice(0, 150)}`)
+    .map((m) => `${m?.from === 'you' ? 'user' : 'nudgy'}: ${String(m?.text ?? '').slice(0, 150)}`)
     .join('\n')
 
   // Open reminders, one short line each, so "I called mum" can tick off the right one.
@@ -127,14 +152,17 @@ app.post('/api/extract', async (req, res) => {
   const listCount = list.length
   const pick = Number.isInteger(selected) && selected >= 1 && selected <= listCount ? selected : null
 
-  const key = `${String(now).slice(0, 10)}|${name}|${recent}|${list.join(';')}|${pick}|${text.trim().toLowerCase()}`
+  const { weekday, calendar: fullCalendar } = calendarFor(now)
+  const calendar = DATE_WORDS.test(text) ? fullCalendar : ''
+
+  const key = `${String(now).slice(0, 10)}|${name}|${buddy}|${recent}|${list.join(';')}|${pick}|${text.trim().toLowerCase()}`
   if (extractCache.has(key)) return res.json(extractCache.get(key))
 
   try {
     const r = await getClient().responses.create({
       model,
-      instructions: EXTRACT_PROMPT,
-      input: `now: ${now}\nname: ${name || 'friend'}\n${listCount ? `reminders:\n${list.join('\n')}\n` : ''}${pick ? `selected: ${pick}\n` : ''}${recent ? `recent chat:\n${recent}\n` : ''}text: ${text.trim()}`,
+      instructions: withBuddy(EXTRACT_PROMPT, buddy),
+      input: `now: ${now}${weekday ? ` (${weekday})` : ''}\n${calendar ? `calendar: ${calendar}\n` : ''}name: ${name || 'friend'}\n${listCount ? `reminders:\n${list.join('\n')}\n` : ''}${pick ? `selected: ${pick}\n` : ''}${recent ? `recent chat:\n${recent}\n` : ''}text: ${text.trim()}`,
       // Muse Spark can spend ~800 tokens just reasoning on "low", so 800 left nothing for the JSON.
       max_output_tokens: 2000,
       reasoning: { effort: 'low' },
@@ -145,7 +173,7 @@ app.post('/api/extract', async (req, res) => {
       throw new Error(`Model returned no JSON (status ${r.status}${r.incomplete_details ? `, ${r.incomplete_details.reason}` : ''})`)
     }
     const json = JSON.parse(r.output_text.slice(r.output_text.indexOf('{'), r.output_text.lastIndexOf('}') + 1))
-    const result = { reply: String(json.reply ?? ''), mood: json.mood === 'overwhelmed' ? 'overwhelmed' : null, actions: cleanActions(json.actions, listCount), tasks: (Array.isArray(json.tasks) ? json.tasks : []).map(cleanTask).filter(Boolean) }
+    const result = { reply: String(json.reply ?? ''), mood: json.mood === 'overwhelmed' ? 'overwhelmed' : null, followup: typeof json.followup === 'string' ? json.followup.slice(0, 200) : '', actions: cleanActions(json.actions, listCount), tasks: (Array.isArray(json.tasks) ? json.tasks : []).map(cleanTask).filter(Boolean) }
     extractCache.set(key, result)
     res.json(result)
   } catch (err) {
@@ -154,14 +182,87 @@ app.post('/api/extract', async (req, res) => {
   }
 })
 
-// One poke line for a task that's due. Called by the browser's scheduler (one task per minute at most)
-// or the "Poke me" button. The browser keeps a canned line as backup if this fails.
-const POKE_PROMPT = `You are Pokey, a cheeky, warm reminder buddy. Punny, never flirty, mean or medical.
+// Photo proof: SAM 3.1 looks for the task's object in the photo. Called once, when a photo is added.
+app.post('/api/proof', async (req, res) => {
+  const { image, phrase } = req.body ?? {}
+  const what = typeof phrase === 'string' ? phrase.trim().slice(0, 80) : ''
+  if (!what || typeof image !== 'string') return res.status(400).json({ error: 'Need a photo and what to look for' })
+  try {
+    res.json(await findInPhoto({ image, phrase: what }))
+  } catch (err) {
+    console.error('[proof]', err.message)
+    res.status(502).json({ error: err.message })
+  }
+})
+
+// Personal badge art with Muse Image. Only when a user taps "Create my badge" on a badge they've earned.
+// A server-wide daily cap (MAX_IMAGES_PER_DAY, default 20) protects the credits; repeats come from the cache.
+let imageDay = ''
+let imageCount = 0
+const badgeCache = new Map()
+function takeImageSlot() {
+  const day = new Date().toDateString()
+  if (day !== imageDay) { imageDay = day; imageCount = 0 }
+  if (imageCount >= (Number(process.env.MAX_IMAGES_PER_DAY) || 20)) return false
+  imageCount++
+  return true
+}
+
+app.post('/api/badge', async (req, res) => {
+  const { badge, context, fresh } = req.body ?? {}
+  if (!BADGE_IDS.includes(badge)) return res.status(400).json({ error: 'Unknown badge' })
+  const prompt = badgePrompt(badge, context)
+  if (!fresh && badgeCache.has(prompt)) return res.json({ image: badgeCache.get(prompt) })
+  if (!takeImageSlot()) return res.status(429).json({ error: "That's all the badge art for today. Try again tomorrow." })
+  try {
+    const image = `data:image/png;base64,${(await generateImage(prompt)).toString('base64')}`
+    badgeCache.set(prompt, image)
+    res.json({ image })
+  } catch (err) {
+    console.error('[badge]', err.message)
+    res.status(502).json({ error: "Couldn't draw that just now. Try again in a bit." })
+  }
+})
+
+// One nudge line for a task that's due. Called by the browser's scheduler (one task per minute at most)
+// or the "Nudge me" button. The browser keeps a canned line as backup if this fails.
+const NUDGE_PROMPT = `You are Nudgy, a cheeky, warm reminder buddy. Punny, never flirty, mean or medical, and never label the person (no "procrastinator" or "lazy"): joke about the task or yourself.
 Write ONE reminder line, max 20 words, to the user by name about their task. Level 1 is a gentle nudge, 4 is dramatic and over the top. Reply with the line only.`
 
-app.post('/api/poke', async (req, res) => {
+// Nudge lines can come from an open-weights Meta model (Muse Spark Open or Muse Glimmer) hosted on Modal, Baseten
+// or Fireworks, through an OpenAI-style chat endpoint. Turned on with NUDGE_ENGINE=open plus OPEN_BASE_URL,
+// OPEN_API_KEY and OPEN_MODEL. If it fails, the nudge falls back to Muse Spark, so a nudge is never lost.
+const openEnabled = () => process.env.NUDGE_ENGINE === 'open' && !!process.env.OPEN_BASE_URL && !!process.env.OPEN_API_KEY && !!process.env.OPEN_MODEL
+let openClient
+async function openNudge(instructions, input) {
+  openClient ??= new OpenAI({ baseURL: process.env.OPEN_BASE_URL, apiKey: process.env.OPEN_API_KEY })
+  const r = await openClient.chat.completions.create({
+    model: process.env.OPEN_MODEL,
+    messages: [{ role: 'system', content: instructions }, { role: 'user', content: input }],
+    // Open models can spend part of this on reasoning before the line, as Muse Spark did. 1000 is the project cap;
+    // raise OPEN_MAX_TOKENS only if the log shows finish_reason=length with no text.
+    max_tokens: Number(process.env.OPEN_MAX_TOKENS) || 1000,
+    temperature: 0.8,
+  })
+  console.log(`[usage] engine=open model=${process.env.OPEN_MODEL} input_tokens=${r.usage?.prompt_tokens} output_tokens=${r.usage?.completion_tokens}`)
+  // Some open models write their reasoning inline; keep only what follows it.
+  const text = String(r.choices?.[0]?.message?.content ?? '').replace(/<think>[\s\S]*?<\/think>/gi, '').trim().replace(/^"|"$/g, '')
+  if (!text) throw new Error(`Open model returned no text (${r.choices?.[0]?.finish_reason ?? 'no reason'})`)
+  return text
+}
+
+app.post('/api/nudge', async (req, res) => {
   const { name, title, level, due, now } = req.body ?? {}
+  const buddy = cleanBuddy(req.body?.buddy)
   if (!title) return res.status(400).json({ error: 'No task' })
+  const input = `name: ${name || 'friend'}\ntask: ${title}\nlevel: ${level}\n${due ? `due: ${due}\nnow: ${now}` : 'no due time'}`
+  if (openEnabled()) {
+    try {
+      return res.json({ text: await openNudge(withBuddy(NUDGE_PROMPT, buddy), input), engine: 'open' })
+    } catch (err) {
+      console.error('[nudge] open model failed, using Muse Spark:', err.message)
+    }
+  }
   const model = process.env.MODEL_NAME
   if (!model || !process.env.MODEL_API_KEY) {
     return res.status(500).json({ error: 'Set MODEL_API_KEY and MODEL_NAME in .env' })
@@ -169,8 +270,8 @@ app.post('/api/poke', async (req, res) => {
   try {
     const r = await getClient().responses.create({
       model,
-      instructions: POKE_PROMPT,
-      input: `name: ${name || 'friend'}\ntask: ${title}\nlevel: ${level}\n${due ? `due: ${due}\nnow: ${now}` : 'no due time'}`,
+      instructions: withBuddy(NUDGE_PROMPT, buddy),
+      input,
       // 300 was all spent on reasoning, leaving no line; raised with the user's OK.
       max_output_tokens: 1000,
       reasoning: { effort: 'low' },
@@ -178,9 +279,9 @@ app.post('/api/poke', async (req, res) => {
     console.log(`[usage] model=${model} input_tokens=${r.usage?.input_tokens} output_tokens=${r.usage?.output_tokens}`)
     const text = r.output_text?.trim().replace(/^"|"$/g, '')
     if (!text) throw new Error(`Model returned no text (status ${r.status}${r.incomplete_details ? `, ${r.incomplete_details.reason}` : ''})`)
-    res.json({ text })
+    res.json({ text, engine: 'spark' })
   } catch (err) {
-    console.error('[poke]', err.message)
+    console.error('[nudge]', err.message)
     res.status(502).json({ error: err.message })
   }
 })
@@ -190,7 +291,7 @@ app.post('/api/poke', async (req, res) => {
 const dist = path.join(import.meta.dirname, '..', 'dist')
 if (fs.existsSync(dist)) {
   app.use(express.static(dist))
-  // Client-side routes (/pokes, /settings…) all load index.html.
+  // Client-side routes (/nudges, /settings…) all load index.html.
   app.get(/^\/(?!api\/).*/, (_req, res) => res.sendFile(path.join(dist, 'index.html')))
 }
 
@@ -263,4 +364,4 @@ asr.on('connection', (browser) => {
 })
 
 const port = process.env.PORT || 3001
-server.listen(port, () => console.log(`Pokey server on http://localhost:${port}`))
+server.listen(port, () => console.log(`Nudgy server on http://localhost:${port}`))
