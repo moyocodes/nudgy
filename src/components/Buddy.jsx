@@ -16,6 +16,8 @@ export default function Buddy() {
     if (!buddy) return
     // Roughly reading pace, so the mouth stops when a silent line would have finished.
     const speakMs = Math.min(4000, 600 + buddy.text.length * 45)
+    // How long the bubble stays up: long enough to read it all, and then some (it used to vanish ~2s after the words).
+    const stayMs = Math.min(20000, 6000 + buddy.text.length * 70)
     let hideTimer
     setTalking(true)
 
@@ -28,12 +30,12 @@ export default function Buddy() {
       line.volume = getVolume()
       line.onend = () => {
         setTalking(false)
-        hideTimer = setTimeout(() => setBuddy(null), 1500)
+        hideTimer = setTimeout(() => setBuddy(null), 5000)
       }
       window.speechSynthesis.speak(line)
     } else {
       const quiet = setTimeout(() => setTalking(false), speakMs)
-      hideTimer = setTimeout(() => setBuddy(null), speakMs + 1800)
+      hideTimer = setTimeout(() => setBuddy(null), stayMs)
       return () => { clearTimeout(quiet); clearTimeout(hideTimer) }
     }
     return () => {

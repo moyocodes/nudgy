@@ -21,3 +21,4 @@
 - Snooze choices and no coin penalties: nudges and the Today banner now offer Snooze 30 min / 1 hour / 2 hours, and neither snoozing nor ignoring a nudge takes coins any more (the stern lines and the coins explainer were reworded to match).
 - Photo proof can be skipped: "Skip photo" on the task card, nudge row, Today banner and proof page (and saying "done" in chat) finishes the task for the normal coins, just without the +15 bonus. Before, proof tasks could not be finished without a photo.
 - Chat snooze asks "how long?" (30 min, 1 hour or 2 hours) unless the message already says, and the answer is read locally with no model call.
+- Nudgy's speech bubble now stays up 6s plus 70ms per character (up to 20s), and 5s after the voice finishes, so longer answers can be read.
