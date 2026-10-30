@@ -78,7 +78,7 @@ export default function NudgesPage() {
                   nudge={p}
                   task={task}
                   onDone={latest.has(p.id) ? () => completeTask(p.taskId) : undefined}
-                  onSnooze={latest.has(p.id) ? () => snoozeTask(p.taskId) : undefined}
+                  onSnooze={latest.has(p.id) ? (minutes) => snoozeTask(p.taskId, minutes) : undefined}
                 />
               </li>
             )

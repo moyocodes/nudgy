@@ -41,17 +41,17 @@ const CELEBRATE = {
 // A task was just snoozed. First time, or again.
 const SNOOZE = {
   first: [
-    (n) => `Snoozed for an hour. I'll be back, ${n}. I always come back.`,
-    (n) => `One hour, ${n}. Then I'm nudging again.`,
+    (n, d) => `Snoozed for ${d}. I'll be back, ${n}. I always come back.`,
+    (n, d) => `${d[0].toUpperCase()}${d.slice(1)}, ${n}. Then I'm nudging again.`,
   ],
   again: [
-    (n) => `Snoozed again. Noted, ${n}. Same time, one hour from now.`,
+    (n, d) => `Snoozed again. Noted, ${n}. ${d[0].toUpperCase()}${d.slice(1)} from now.`,
     (n) => `Round two of snooze. I'll keep the seat warm, ${n}.`,
   ],
 }
 
 export const celebrationLine = (context, name, title, seed) => line(CELEBRATE[context] ?? CELEBRATE.plain, seed)(name, title)
-export const snoozeLine = (again, name, seed) => line(again ? SNOOZE.again : SNOOZE.first, seed)(name)
+export const snoozeLine = (again, name, seed, duration = 'an hour') => line(again ? SNOOZE.again : SNOOZE.first, seed)(name, duration)
 
 // Greetings, by time of day, so "hey" at 7am and at 1am don't get the same hello.
 const GREET = {

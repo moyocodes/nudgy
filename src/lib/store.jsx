@@ -6,6 +6,7 @@ import { applyAccent } from './themes.js'
 import { logout, pullState, pushState } from './account.js'
 import { isEarly, isOverdue } from './format.js'
 import { snoozeLine } from './phrases.js'
+import { SNOOZE_OPTIONS } from './nudges.js'
 
 // How many open reminders one person can have at a time.
 export const MAX_OPEN_TASKS = Number(import.meta.env.VITE_MAX_OPEN_TASKS) || 30
@@ -39,9 +40,10 @@ function usePersisted(key, fallback) {
   return [value, setValue]
 }
 
+const snoozeLabel = (minutes) => SNOOZE_OPTIONS.find((o) => o.minutes === minutes)?.label ?? `${minutes} min`
+
 export const POINTS_PER_TASK = 10
 export const PROOF_BONUS = 15
-export const SNOOZE_COST = 1
 export const GAME_COST = 5
 
 export function StoreProvider({ children }) {
@@ -187,20 +189,19 @@ export function StoreProvider({ children }) {
     setNudges((ps) => ps.filter((p) => p.taskId !== id))
   }
 
-  // Snoozing clears the task's nudges and holds the scheduler off for an hour.
-  // The third snooze on the same task earns the joke crash screen.
-  // Coins are points: earned by finishing, spent on games, lost by ignoring nudges. Never below zero.
+  // Coins are points: earned by finishing, spent on games. Never below zero.
   function spendPoints(n) {
     setPoints((p) => Math.max(0, p - n))
     return true
   }
 
-  function snoozeTask(id) {
+  // Snoozing clears the task's nudges and holds the scheduler off for the chosen time (an hour by default).
+  // It's free. The third snooze on the same task earns the joke crash screen.
+  function snoozeTask(id, minutes = 60) {
     setNudges((ps) => ps.filter((p) => p.taskId !== id))
-    updateTask(id, { snoozedUntil: new Date(Date.now() + 3600000).toISOString() })
-    spendPoints(SNOOZE_COST)
+    updateTask(id, { snoozedUntil: new Date(Date.now() + minutes * 60000).toISOString() })
     const count = (snoozes[id] ?? 0) + 1
-    if (count < 3) say(`${snoozeLine(count > 1, name || 'friend', Date.now())} (−${SNOOZE_COST} coin)`)
+    if (count < 3) say(snoozeLine(count > 1, name || 'friend', Date.now(), snoozeLabel(minutes)))
     setSnoozes((s) => ({ ...s, [id]: count >= 3 ? 0 : count }))
     if (count >= 3) setJoke({ taskId: id, key: Date.now() })
   }

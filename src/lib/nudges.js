@@ -9,8 +9,12 @@ const RENUDGE_MS = [10, 5].map((m) => m * 60 * 1000)
 const renudgeAfter = (count) => RENUDGE_MS[Math.min(count - 1, RENUDGE_MS.length - 1)]
 // Only the first few nudges per task are model-written; after that the stern canned lines rotate (no cost).
 export const MODEL_NUDGES = 3
-// Each nudge from the third one on costs coins: ignoring Nudgy isn't free.
-export const IGNORE_COST = 2
+// How long a task can be snoozed for. Snoozing never costs coins.
+export const SNOOZE_OPTIONS = [
+  { label: '30 min', minutes: 30 },
+  { label: '1 hour', minutes: 60 },
+  { label: '2 hours', minutes: 120 },
+]
 
 const BACKUP_LINES = {
   1: (n, t) => `${n}, "${t}" is coming up. Future you says thanks in advance.`,
@@ -19,9 +23,9 @@ const BACKUP_LINES = {
   4: (n, t) => `${n}. ${n.toUpperCase()}. "${t}" has filed a missing person report.`,
 }
 const SHOVES = [
-  (n, t) => `${n}, "${t}". Now. I'm charging coins for every nudge you ignore.`,
-  (n, t) => `Still waiting on "${t}", ${n}. My finger is getting tired and your coins are getting fewer.`,
-  (n, t) => `${n}! "${t}"! Done or Snooze. Pick one. I'll wait. Ten minutes, to be exact.`,
+  (n, t) => `${n}, "${t}". Now. I'm a woodpecker with a deadline.`,
+  (n, t) => `Still waiting on "${t}", ${n}. My finger is getting tired.`,
+  (n, t) => `${n}! "${t}"! Done or Snooze. Pick one. Or I'll be back in five minutes.`,
   (n, t) => `"${t}" is starting to feel left out, ${n}.`,
 ]
 

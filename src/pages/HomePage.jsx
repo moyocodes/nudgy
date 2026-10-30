@@ -13,6 +13,7 @@ import TaskCard from '../components/TaskCard.jsx'
 import Story from '../components/Story.jsx'
 import Mascot from '../components/Mascot.jsx'
 import { BellIcon, ChevronIcon, TrophyIcon } from '../components/Icons.jsx'
+import { SNOOZE_OPTIONS } from '../lib/nudges.js'
 
 
 // What Nudgy says while the model reads a brain dump. One at random each time.
@@ -356,6 +357,7 @@ export default function HomePage() {
   const { name, buddyName, tasks, addTasks, introSeen, nudges, completeTask, snoozeTask, updateTask, deleteTask, replaceTasks, replacePoints, points, aboutTaskId, setAboutTaskId, streak, tutorialSeen, openTutorial, say, chat, addChat } = useStore()
   const [storyOpen, openStory, closeStory] = useDailyStory(tutorialSeen && introSeen)
   const [askingProof, setAskingProof] = useState(false)
+  const [snoozingBanner, setSnoozingBanner] = useState(false)
   // A day picked from the week strip ("Wed Oct 28 2026"), or null for the full list.
   const [day, setDay] = useState(null)
   const listRef = useRef(null)
@@ -649,9 +651,17 @@ export default function HomePage() {
                 </button>
                 <Link to={`/proof/${latestTask.id}`} className="rounded-full bg-primary px-3 py-1 text-sm font-semibold text-on-primary">Snap +15</Link>
               </span>
+            ) : snoozingBanner ? (
+              <span className="flex shrink-0 items-center">
+                {SNOOZE_OPTIONS.map((o) => (
+                  <button key={o.minutes} type="button" onClick={() => { snoozeTask(latestTask.id, o.minutes); setSnoozingBanner(false) }} className="rounded-full px-2 py-1 text-sm font-semibold text-ink/60 hover:bg-ink/5">
+                    {o.label}
+                  </button>
+                ))}
+              </span>
             ) : (
               <span className="flex shrink-0 items-center">
-                <button type="button" onClick={() => snoozeTask(latestTask.id)} className="rounded-full px-2 py-1 text-sm font-semibold text-ink/50 hover:bg-ink/5">
+                <button type="button" onClick={() => setSnoozingBanner(true)} className="rounded-full px-2 py-1 text-sm font-semibold text-ink/50 hover:bg-ink/5">
                   Snooze
                 </button>
                 <button type="button" onClick={() => (latestTask.physical ? setAskingProof(true) : completeTask(latestTask.id))} className="rounded-full px-2 py-1 text-sm font-semibold text-primary hover:bg-ink/5">

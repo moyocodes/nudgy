@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { BellIcon, CameraIcon } from './Icons.jsx'
+import { SNOOZE_OPTIONS } from '../lib/nudges.js'
 
 // How pushy a nudge is shows as a small label, not a louder colour.
 const LEVEL_LABEL = { 1: 'Nudge', 2: 'Nudge', 3: 'Prod', 4: 'Shove' }
@@ -10,6 +11,7 @@ const LEVEL_LABEL = { 1: 'Nudge', 2: 'Nudge', 3: 'Prod', 4: 'Shove' }
 // Only the newest nudge per task gets actions; older ones read as history.
 export default function NudgeBubble({ nudge, task, onDone, onSnooze }) {
   const [asking, setAsking] = useState(false)
+  const [snoozing, setSnoozing] = useState(false)
   const navigate = useNavigate()
   const time = nudge.at && new Date(nudge.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
   const actionable = task && !task.done && (onDone || onSnooze)
@@ -34,7 +36,7 @@ export default function NudgeBubble({ nudge, task, onDone, onSnooze }) {
           {time && <span className="ml-auto shrink-0 tabular-nums text-ink/40">{time}</span>}
         </div>
         <p className={`mt-1 text-[15px] leading-snug ${actionable ? '' : 'text-ink/60'}`}>{nudge.text}</p>
-        {actionable && !asking && (
+        {actionable && !asking && !snoozing && (
           <div className="mt-3 flex gap-2">
             {onDone && (
               <button type="button" onClick={() => (task.physical ? setAsking(true) : onDone())} className={`${btn} bg-primary text-on-primary`}>
@@ -42,10 +44,23 @@ export default function NudgeBubble({ nudge, task, onDone, onSnooze }) {
               </button>
             )}
             {onSnooze && (
-              <button type="button" onClick={onSnooze} className={`${btn} border-[length:var(--bw)] border-line text-ink/70 hover:bg-ink/5`}>
-                Snooze 1h
+              <button type="button" onClick={() => setSnoozing(true)} className={`${btn} border-[length:var(--bw)] border-line text-ink/70 hover:bg-ink/5`}>
+                Snooze
               </button>
             )}
+          </div>
+        )}
+        {/* Snoozing is free: pick how long. */}
+        {actionable && snoozing && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {SNOOZE_OPTIONS.map((o) => (
+              <button key={o.minutes} type="button" onClick={() => onSnooze(o.minutes)} className={`${btn} border-[length:var(--bw)] border-line text-ink/70 hover:bg-ink/5`}>
+                {o.label}
+              </button>
+            ))}
+            <button type="button" onClick={() => setSnoozing(false)} className={`${btn} text-ink/50 hover:bg-ink/5`}>
+              Back
+            </button>
           </div>
         )}
         {/* Proof tasks ask, they don't insist. Same choice as on the task card. */}
