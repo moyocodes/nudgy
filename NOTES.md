@@ -19,3 +19,4 @@
 - Alarm chime fixed: it played at the same moment as the spoken nudge and before audio was unlocked, so it was never heard. Now the chime is off until the user allows it (which also unlocks audio), it plays first and the voice waits for it, and "Alarm sound" is a row in Set Nudgy up.
 - Removed the "hey Nudgy" wake word and hands-free conversations (component, listener, Me toggle, permission text).
 - Snooze choices and no coin penalties: nudges and the Today banner now offer Snooze 30 min / 1 hour / 2 hours, and neither snoozing nor ignoring a nudge takes coins any more (the stern lines and the coins explainer were reworded to match).
+- Photo proof can be skipped: "Skip photo" on the task card, nudge row, Today banner and proof page (and saying "done" in chat) finishes the task for the normal coins, just without the +15 bonus. Before, proof tasks could not be finished without a photo.

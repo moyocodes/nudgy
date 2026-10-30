@@ -400,9 +400,8 @@ export default function HomePage() {
       const task = listed[a.n - 1]
       if (!task) continue
       if (a.type === 'done') {
-        // Photo-proof tasks need the photo, whoever says it's done.
-        if (task.physical) said.push(`"${task.title}" needs a photo first. Tap the camera on it.`)
-        else { completeTask(task.id); said.push(`Ticked off "${task.title}".`) }
+        completeTask(task.id)
+        said.push(`Ticked off "${task.title}".${task.physical ? ' No photo, so no bonus.' : ''}`)
       }
       if (a.type === 'delete') { deleteTask(task.id); said.push(`Binned "${task.title}".`) }
       if (a.type === 'snooze') { snoozeTask(task.id); said.push(`Snoozed "${task.title}" for an hour.`) }
@@ -425,7 +424,7 @@ export default function HomePage() {
         const title = a.title || task.title
         said.push(
           'proof' in a
-            ? a.proof ? `"${title}" now needs a photo to finish.` : `"${title}" no longer needs a photo.`
+            ? a.proof ? `"${title}" now has a photo bonus.` : `"${title}" no longer needs a photo.`
             : 'repeat' in a
             ? a.repeat ? `"${title}" now repeats: ${describeRepeat(a.repeat)}.` : `"${title}" won't repeat any more.`
             : a.due ? `Moved "${title}" to ${friendlyDue(changes.due).toLowerCase()}.`
@@ -648,6 +647,9 @@ export default function HomePage() {
               <span className="flex shrink-0 items-center gap-1">
                 <button type="button" onClick={() => setAskingProof(false)} className="rounded-full px-2 py-1 text-sm font-semibold text-ink/60 hover:bg-ink/5">
                   Not now
+                </button>
+                <button type="button" onClick={() => { completeTask(latestTask.id); setAskingProof(false) }} className="rounded-full px-2 py-1 text-sm font-semibold text-ink/60 hover:bg-ink/5">
+                  Skip photo
                 </button>
                 <Link to={`/proof/${latestTask.id}`} className="rounded-full bg-primary px-3 py-1 text-sm font-semibold text-on-primary">Snap +15</Link>
               </span>

@@ -293,9 +293,12 @@ export default function TaskCard({ task }) {
             className="basis-full"
           >
             <div className="mt-2 flex flex-wrap items-center gap-2 border-t-[length:var(--bw)] border-line pt-3">
-              <span className="mr-auto text-sm font-medium">Photo proof needed. Pics or it didn't happen.</span>
+              <span className="mr-auto text-sm font-medium">Snap a photo for the bonus? Pics or it didn't happen.</span>
               <button type="button" onClick={() => setAsking(false)} className="min-h-9 rounded-full px-3 text-sm font-semibold text-ink/60 hover:bg-ink/5">
                 Not now
+              </button>
+              <button type="button" onClick={() => { completeTask(task.id); setAsking(false) }} className="min-h-9 rounded-full px-3 text-sm font-semibold text-ink/60 hover:bg-ink/5">
+                Skip photo
               </button>
               <button type="button" onClick={() => navigate(`/proof/${task.id}`)} className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-primary px-3 text-sm font-semibold text-on-primary">
                 <CameraIcon size={15} /> Snap it +15

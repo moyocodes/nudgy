@@ -73,11 +73,16 @@ export default function NudgeBubble({ nudge, task, onDone, onSnooze }) {
               transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
               className="mt-3 flex flex-col gap-2 border-t-[length:var(--bw)] border-line pt-3"
             >
-              <span className="text-sm font-medium">Photo proof needed. Pics or it didn't happen.</span>
+              <span className="text-sm font-medium">Snap a photo for the bonus? Pics or it didn't happen.</span>
               <div className="flex gap-2">
                 <button type="button" onClick={() => setAsking(false)} className={`${btn} text-ink/60 hover:bg-ink/5`}>
                   Not now
                 </button>
+                {onDone && (
+                  <button type="button" onClick={() => { setAsking(false); onDone() }} className={`${btn} text-ink/60 hover:bg-ink/5`}>
+                    Skip photo
+                  </button>
+                )}
                 <button type="button" onClick={() => navigate(`/proof/${task.id}`)} className={`${btn} inline-flex items-center justify-center gap-1.5 bg-primary text-on-primary`}>
                   <CameraIcon size={15} /> Snap it +15
                 </button>

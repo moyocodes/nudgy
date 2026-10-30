@@ -130,7 +130,10 @@ export default function ProofPage() {
       ) : state === 'found' ? (
         <Button onClick={accept}>Claim +{PROOF_BONUS} bonus</Button>
       ) : task.physical ? (
-        <Button variant="ghost" onClick={() => navigate(-1)}>Not now</Button>
+        <div className="flex gap-2">
+          <Button variant="ghost" onClick={() => navigate(-1)}>Not now</Button>
+          <Button variant="ghost" onClick={skip}>Skip photo (no bonus)</Button>
+        </div>
       ) : (
         <Button variant="ghost" onClick={skip}>Skip proof (no bonus)</Button>
       )}

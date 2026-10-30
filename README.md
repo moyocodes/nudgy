@@ -11,7 +11,7 @@ Built from scratch for the Meta Global AI Developer Hackathon, Oct 26 – Nov 4,
 - **Messy in, tidy out.** "ugh dentist?? oat milk. yinka's tmrw like 5pm" becomes three reminders with times. Muse Spark fixes typos and mishearings, works out dates, priorities and repeats ("every weekday at 8"), and asks a short, punny question when something essential is missing.
 - **It knows your list.** "I called mum", "move the gym to 7" or "cancel the dentist" act on the existing reminder instead of adding a duplicate. Tap **@** on a reminder to give it instructions directly. "Undo" reverses the last change.
 - **Nudges until it's done.** Due reminders get a fresh, model-written line every hour, escalating from Nudge to Shove, until you tap Done or Snooze. Sleep hours hold back low-priority nudges. Nudges show as browser notifications when the tab is in the background.
-- **Pics or it didn't happen.** Errands marked as photo proof can't be ticked off without a photo, and earn +15 points.
+- **Pics or it didn't happen.** Errands marked as photo proof earn +15 points with a photo, or can be skipped for the normal points.
 - **Calm mode.** Say you're swamped and the list folds down to the one thing that matters most, with a 30-second nudge-break game.
 - **Rewards.** Points, streaks and badges.
 - **Every device.** Log in with just your email (each new device is confirmed by an emailed link or code), and tasks, chat and points sync.

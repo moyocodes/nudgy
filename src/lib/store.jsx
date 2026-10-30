@@ -160,8 +160,7 @@ export function StoreProvider({ children }) {
   function completeTask(id, { proof = false } = {}) {
     const task = tasks.find((t) => t.id === id)
     if (!task || task.done) return
-    // Photo-proof tasks can't be ticked off without the photo; callers send people to the proof page.
-    if (task.physical && !proof) return false
+    // Photo proof is optional: without the photo the task still counts, just without the bonus.
     const next = nextOccurrence(task.repeat)
     if (next) {
       setTasks((ts) => ts.map((t) => (t.id === id ? { ...t, due: next.toISOString(), snoozedUntil: null, lastDoneAt: new Date().toISOString() } : t)))
