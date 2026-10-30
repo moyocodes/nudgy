@@ -23,3 +23,4 @@
 - Chat snooze asks "how long?" (30 min, 1 hour or 2 hours) unless the message already says, and the answer is read locally with no model call.
 - Nudgy's speech bubble now stays up 6s plus 70ms per character (up to 20s), and 5s after the voice finishes, so longer answers can be read.
 - Priority is now read from the stakes and tone of what the user says (deadline, money/health/work, someone relying on them, how strongly they say it) through the extract prompt, instead of just "urgent" or "maybe". No new model calls.
+- Recurring tasks no longer pile up as overdue: a slot missed on an earlier day is skipped and the task moves to its next slot (checked on load and every 5 minutes). Today's slot stays until ticked so its nudges still fire.

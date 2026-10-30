@@ -138,6 +138,22 @@ export function StoreProvider({ children }) {
     return () => { cancelled = true }
   }, [account?.session]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // A recurring task whose slot was missed on an earlier day isn't "overdue": it skips ahead to its next slot.
+  // Today's slot stays put until it's ticked, so the nudges for it still fire.
+  const [clock, setClock] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => setClock((c) => c + 1), 5 * 60000)
+    return () => clearInterval(id)
+  }, [])
+  useEffect(() => {
+    const startOfToday = new Date().setHours(0, 0, 0, 0)
+    const missed = tasks.filter((t) => !t.done && t.repeat?.length && t.due && new Date(t.due) < startOfToday)
+    if (!missed.length) return
+    const ids = new Set(missed.map((t) => t.id))
+    setTasks((ts) => ts.map((t) => (ids.has(t.id) ? { ...t, due: nextOccurrence(t.repeat)?.toISOString() ?? t.due, snoozedUntil: null } : t)))
+    setNudges((ps) => ps.filter((p) => !ids.has(p.taskId)))
+  }, [tasks, hydrated, clock]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // After that, every change is saved to the account a moment later.
   const syncKey = JSON.stringify(synced)
   useEffect(() => {
