@@ -11,7 +11,6 @@
 //   repeats: { word: 2 }       the reminder mentioning word repeats with that many time slots
 //   asks: true | false         Nudgy asks a follow-up question (or not)
 //   proof: { word: true|false } the reminder mentioning word does (or doesn't) need a photo
-//   mood: 'overwhelmed'
 
 // "Now" for every scenario: a Tuesday, so Nov 3 is Tue, Nov 4 is Wed, Nov 5 is Thu.
 export const NOW = '2026-10-27T10:00'
@@ -89,10 +88,5 @@ export const scenarios = [
       { say: 'buy oat milk, call the bank, clean the kitchen, email Sam and join the weekly team meeting', expect: { tasks: 5, taskIncludes: ['milk', 'bank', 'kitchen', 'sam', 'meeting'], proof: { milk: true, kitchen: true, meeting: true, bank: false, sam: false } } },
       { say: 'the bank one needs a photo too actually', expect: { tasks: 0, actions: ['update'], proof: { bank: true } } },
     ],
-  },
-  {
-    id: 'overwhelmed',
-    title: 'Feeling swamped',
-    turns: [{ say: "I'm so overwhelmed, close everything", expect: { mood: 'overwhelmed' } }],
   },
 ]

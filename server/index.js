@@ -52,7 +52,7 @@ app.post('/api/test', async (_req, res) => {
 // Only called when the user presses Add tasks / Enter. Same text on the same day is served from cache.
 const EXTRACT_PROMPT = `You are Nudgy, a cheeky, warm reminder buddy (never flirty, mean or medical). Input may be messy speech-to-text; work out what they mean.
 Return ONLY compact JSON, omitting null/false/empty fields:
-{"reply":str,"followup"?:str,"mood"?:"overwhelmed","actions"?:[{"type":"done"|"delete"|"snooze"|"update"|"undo","n":num,"due"?,"title"?,"priority"?,"repeat"?,"proof"?,"proofOf"?}],"tasks"?:[{"title":str,"due"?,"priority":"low"|"medium"|"high","proof"?:true,"proofOf"?:str,"ask"?:{"kind":"when"|"who"|"what"|"how"|"why","text":str},"repeat"?:[{"days":[0-6],"time":"HH:mm"}]}]}
+{"reply":str,"followup"?:str,"actions"?:[{"type":"done"|"delete"|"snooze"|"update"|"undo","n":num,"due"?,"title"?,"priority"?,"repeat"?,"proof"?,"proofOf"?}],"tasks"?:[{"title":str,"due"?,"priority":"low"|"medium"|"high","proof"?:true,"proofOf"?:str,"ask"?:{"kind":"when"|"who"|"what"|"how"|"why","text":str},"repeat"?:[{"days":[0-6],"time":"HH:mm"}]}]}
 - Only items in tasks/actions get saved. Scan the whole text for EVERY possible reminder (tasks, errands, appointments, deadlines, commitments, things to remember, even implied ones like "mum's birthday Friday"); each is its own task, never merged or dropped. If something might be a reminder but is unclear, or nothing was saved and it isn't chit-chat, set followup: one short punny question asking what or when. If there is no reminder in it at all and it isn't chit-chat, say so plainly in reply ("I couldn't find a reminder in that") and set followup offering one ("Want me to set a reminder about something?").
 - reminders: user's open list, numbered. Text about one (done, cancel, move, rename, snooze) = action with its n, never a duplicate task. "undo" = {"type":"undo"}. [asked: …] = waiting on your question; an answer = update actions (due, or title for who/what). selected = text is instructions for that n. "split into X and Y" = delete + 2 tasks.
 - recent chat is context only; don't re-add from it. Greetings or chat ("hey Nudgy", "thanks") are not tasks; just reply.
@@ -60,7 +60,6 @@ Return ONLY compact JSON, omitting null/false/empty fields:
 - repeat: recurring only; days 0=Sun; no time = one daily time (due, else 09:00); due = next slot. repeat:null in an update stops it.
 - proof: true when finishing means being somewhere or leaves something to photograph: buying or picking up an item, cleaning, tidying, packing, cooking, fixing, posting a parcel, going to a place or an appointment, attending or joining a meeting or event. Not for calls, messages, emails, online payments, bookings, decisions or things to remember. proofOf: the short noun phrase the photo should show ("oat milk carton", "meeting room"). In an update action, proof true or false (with proofOf) when they ask for a photo on a reminder or drop it.
 - ask: one short punny question only if essential info is missing; don't ask what you can infer.
-- mood overwhelmed: stressed/swamped/wants things cleared. Then reply gently says the list is folded to one thing.
 - reply: one witty sentence using their name, never labelling them; never list tasks or claim you saved anything.`
 
 const extractCache = new Map()
@@ -173,7 +172,7 @@ app.post('/api/extract', async (req, res) => {
       throw new Error(`Model returned no JSON (status ${r.status}${r.incomplete_details ? `, ${r.incomplete_details.reason}` : ''})`)
     }
     const json = JSON.parse(r.output_text.slice(r.output_text.indexOf('{'), r.output_text.lastIndexOf('}') + 1))
-    const result = { reply: String(json.reply ?? ''), mood: json.mood === 'overwhelmed' ? 'overwhelmed' : null, followup: typeof json.followup === 'string' ? json.followup.slice(0, 200) : '', actions: cleanActions(json.actions, listCount), tasks: (Array.isArray(json.tasks) ? json.tasks : []).map(cleanTask).filter(Boolean) }
+    const result = { reply: String(json.reply ?? ''), followup: typeof json.followup === 'string' ? json.followup.slice(0, 200) : '', actions: cleanActions(json.actions, listCount), tasks: (Array.isArray(json.tasks) ? json.tasks : []).map(cleanTask).filter(Boolean) }
     extractCache.set(key, result)
     res.json(result)
   } catch (err) {

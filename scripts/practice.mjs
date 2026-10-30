@@ -51,10 +51,10 @@ function fabricate(expect = {}, open) {
   const updates = [...new Set([...Object.keys(expect.due ?? {}), ...Object.keys(expect.proof ?? {})])].filter((w) => find(w) && !words.includes(w))
   const actions = (expect.actions ?? []).flatMap((type) =>
     type === 'update' ? updates.map((w) => ({ type, n: find(w), due: dueOf(w), ...(expect.proof && w in expect.proof ? { proof: expect.proof[w] } : {}) })) : (expect.actionOn ?? []).map((w) => ({ type, n: find(w) })))
-  return { reply: '(mock)', mood: expect.mood, followup: expect.asks && !tasks.some((t) => t.ask) ? 'Which one, and when?' : undefined, tasks, actions }
+  return { reply: '(mock)', followup: expect.asks && !tasks.some((t) => t.ask) ? 'Which one, and when?' : undefined, tasks, actions }
 }
 
-const norm = (r) => ({ reply: r.reply ?? '', mood: r.mood ?? null, followup: r.followup ?? '', tasks: r.tasks ?? [], actions: r.actions ?? [] })
+const norm = (r) => ({ reply: r.reply ?? '', followup: r.followup ?? '', tasks: r.tasks ?? [], actions: r.actions ?? [] })
 
 function dueFor(word, got, open) {
   const fromTasks = got.tasks.filter((t) => t.title.toLowerCase().includes(word)).map((t) => t.due)
@@ -82,7 +82,6 @@ function checks(expect = {}, got, open) {
     add(has === want, `"${w}" ${want ? 'needs' : 'does not need'} a photo (got ${has === null ? 'nothing' : has ? 'needs' : 'no'})`)
   }
   if (expect.asks !== undefined) add(asked === expect.asks, expect.asks ? 'Nudgy asks a question' : 'Nudgy does not ask')
-  if (expect.mood) add(got.mood === expect.mood, `mood is ${expect.mood} (got ${got.mood ?? 'none'})`)
   return out
 }
 
@@ -112,7 +111,6 @@ for (const s of chosen) {
     console.log(`  nudgy:  ${said || '(nothing)'}`)
     for (const t of got.tasks) console.log(`    + ${t.title}${t.due ? ` · ${t.due}` : ' · no time'}${t.repeat ? ` · repeats ×${t.repeat.length}` : ''}${t.proof ? ` · needs photo${t.proofOf ? ` (${t.proofOf})` : ''}` : ''}${t.ask ? ` · asks: ${t.ask.text}` : ''}`)
     for (const a of got.actions) console.log(`    ~ ${a.type} #${a.n ?? ''} ${open[a.n - 1]?.title ?? ''}${a.due ? ` → ${a.due}` : ''}`)
-    if (got.mood) console.log(`    mood: ${got.mood}`)
     for (const c of checks(turn.expect, got, open)) { total++; if (c.ok) passed++; console.log(`    ${c.ok ? '✓' : '✗'} ${c.label}`) }
     // Carry the conversation forward the way the app does.
     for (const a of got.actions) {

@@ -4,7 +4,7 @@ import { useStore } from '../lib/store.jsx'
 import { Button } from '../components/ui.jsx'
 import Mascot from '../components/Mascot.jsx'
 import InstallButton from '../components/InstallButton.jsx'
-import { ArrowIcon, BellIcon, CameraIcon, CheckIcon, FlameIcon, MicIcon, SparkIcon, UserIcon } from '../components/Icons.jsx'
+import { ArrowIcon, BellIcon, CameraIcon, CheckIcon, FlameIcon, MicIcon, UserIcon } from '../components/Icons.jsx'
 
 const tile = 'rounded-3xl border-[length:var(--bw)] border-line bg-surface p-5 shadow-card'
 const label = 'text-xs font-semibold uppercase tracking-wider text-ink/45'
@@ -119,12 +119,6 @@ function Features() {
           <span className="mt-4 inline-flex items-center gap-1 rounded-full bg-success px-2.5 py-1 text-xs font-semibold text-on-primary">
             <CheckIcon size={12} strokeWidth={2.5} /> Complete · +15
           </span>
-        </div>
-
-        <div className={tile}>
-          <SparkIcon size={20} className="text-primary" />
-          <h3 className="mt-3 font-semibold">Calm mode</h3>
-          <p className="mt-1 text-sm text-ink/60">Say you're swamped. The list folds down to one thing.</p>
         </div>
 
         <div className={tile}>

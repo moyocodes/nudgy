@@ -91,7 +91,7 @@ export function StoreProvider({ children }) {
   const [ambient, setAmbient] = usePersisted('ambient', null)
   // One volume for all sounds (lib/volume.js). Background sound plays at a quarter of it.
   const [ambientAsked, setAmbientAsked] = usePersisted('ambientAsked', false)
-  // Everything said to and by Nudgy in the brain dump, oldest first: { id, at, from: 'you'|'nudgy', text, taskIds?, mood? }.
+  // Everything said to and by Nudgy in the brain dump, oldest first: { id, at, from: 'you'|'nudgy', text, taskIds? }.
   const [chat, setChat] = usePersisted('chat', [])
   const addChat = (...msgs) =>
     setChat((c) => [...c, ...msgs.map((m, i) => ({ id: `c${Date.now()}${i}`, at: new Date().toISOString(), ...m }))].slice(-500))

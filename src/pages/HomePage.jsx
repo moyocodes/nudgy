@@ -185,9 +185,6 @@ function WeekGlance({ tasks, day, onPickDay }) {
   )
 }
 
-// Backup for the model's "overwhelmed" mood, and the only check when the model is unreachable.
-const OVERWHELMED = /\b(overwhelm\w*|swamped|stressed|too much|drowning|can'?t cope|close (my|the|all|every)\w*|clear (it|my|the|every)\w*|hide (it|every)\w*)\b/i
-
 // Daily goals: recurring reminders that fall on today, as a checklist. Ticking one moves it to its
 // next slot, so "done today" comes from lastDoneAt. Photo-proof goals go to the proof page instead.
 function DailyGoals({ tasks, onTick }) {
@@ -229,37 +226,6 @@ function DailyGoals({ tasks, onTick }) {
           )
         })}
       </ul>
-    </section>
-  )
-}
-
-// One task instead of a list: overdue first, then the soonest, then the most important.
-function CalmView({ tasks, onExit }) {
-  const rank = { high: 0, medium: 1, low: 2 }
-  const focus = [...tasks].sort((a, b) =>
-    isOverdue(b) - isOverdue(a) || (a.due ? new Date(a.due) : Infinity) - (b.due ? new Date(b.due) : Infinity) || rank[a.priority] - rank[b.priority],
-  )[0]
-  return (
-    <section className="flex flex-col gap-3">
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-ink/45">Just this one</h2>
-        <button type="button" onClick={onExit} className="rounded-full px-2 py-1 text-xs font-semibold text-primary hover:bg-ink/5">
-          Show everything ({tasks.length})
-        </button>
-      </div>
-      {focus ? (
-        <ul><TaskCard task={focus} /></ul>
-      ) : (
-        <p className="py-4 text-center text-ink/50">Nothing on your plate. Genuinely. Go stare at a cloud.</p>
-      )}
-      <Link to="/play" className={`${card} flex items-center gap-3 hover:bg-ink/[0.02]`}>
-        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-soft"><Mascot size={26} /></span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-sm font-semibold">Take a 30-second nudge break?</span>
-          <span className="block text-xs text-ink/50">Whack a few nudges, then come back lighter.</span>
-        </span>
-        <span className="text-sm font-semibold text-primary">Play</span>
-      </Link>
     </section>
   )
 }
@@ -361,15 +327,7 @@ export default function HomePage() {
   // A day picked from the week strip ("Wed Oct 28 2026"), or null for the full list.
   const [day, setDay] = useState(null)
   const listRef = useRef(null)
-  // Calm view: the user said they're swamped, so the list folds down to one task.
-  const [calm, setCalm] = useState(false)
-  function goCalm() {
-    setCalm(true)
-    setDay(null)
-    setTimeout(() => listRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
-  }
   function pickDay(key) {
-    setCalm(false)
     setDay(key)
     if (key) setTimeout(() => listRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
   }
@@ -516,8 +474,7 @@ export default function HomePage() {
         }),
       })
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.statusText)
-      const { reply, mood, followup, actions = [], tasks: found } = await r.json()
-      if (mood === 'overwhelmed' || OVERWHELMED.test(text)) goCalm()
+      const { reply, followup, actions = [], tasks: found } = await r.json()
       if (actions.some((a) => a.type === 'undo')) {
         addChat({ from: 'you', text: said })
         return undoLast()
@@ -548,21 +505,15 @@ export default function HomePage() {
       const question = saved.find((t) => t.ask)?.ask.text ?? listed.find((t) => t.ask && !answered.has(t.id))?.ask.text
       // Nothing saved but it reads like a reminder: ask, don't shrug. The model's followup wins over the backstop.
       const nothing = !saved.length && !changed
-      let ask = question ?? (followup || (nothing && !mood && INTENT_HINT.test(text) ? BACKSTOP : ''))
+      let ask = question ?? (followup || (nothing && INTENT_HINT.test(text) ? BACKSTOP : ''))
       // If the model had nothing to say either, don't shrug: say no reminder was found and offer to set one.
-      if (nothing && !mood && !reply && !ask) ask = OFFER
+      if (nothing && !reply && !ask) ask = OFFER
       if (!question && ask) setPendingQuestion(ask)
       const line = [reply, changed, savedSummary(saved), limitLine(found.length - saved.length), ask].filter(Boolean).join(' ')
       say(line)
-      addChat({ from: 'you', text: said, mood }, { from: 'nudgy', text: line, taskIds: saved.map((t) => t.id) })
+      addChat({ from: 'you', text: said }, { from: 'nudgy', text: line, taskIds: saved.map((t) => t.id) })
     } catch (err) {
       console.warn('[extract] falling back to local parser:', err.message)
-      if (OVERWHELMED.test(text)) {
-        goCalm()
-        const line = "Deep breath. I've folded everything away. Just one thing for now."
-        say(line)
-        return addChat({ from: 'you', text: said, mood: 'overwhelmed' }, { from: 'nudgy', text: line })
-      }
       // The local parser only handles simple lists. A reply to Nudgy's question, an @ instruction
       // or a long sentence would just become a junk task, so say so instead.
       if (about || listed.some((t) => t.ask) || text.split(/\s+/).length > 12) {
@@ -722,9 +673,7 @@ export default function HomePage() {
 
 
       <div ref={listRef} className="flex scroll-mt-20 flex-col gap-4">
-      {calm ? (
-        <CalmView tasks={open} onExit={() => setCalm(false)} />
-      ) : day ? (
+      {day ? (
         <DayView day={day} tasks={tasks} onClear={() => setDay(null)} />
       ) : (
         <>
