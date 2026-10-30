@@ -208,15 +208,41 @@ function takeImageSlot() {
   return true
 }
 
+// Muse Spark turns the plain badge brief into a richer prompt for Muse Image: composition, lighting, mood and
+// small details drawn from what the user really did. One short call per new badge; if it fails, the plain brief is used.
+const ART_PROMPT = `You write prompts for an image model. From the badge brief, write ONE vivid prompt, max 90 words: a single round sticker badge, flat vector style with a thick dark outline, cheeky and warm. Say what is in the middle, what small details sit around it (drawn from the user's tasks), the lighting, and the mood. Keep the brief's colours. No text, letters or numbers anywhere in the picture. Reply with the prompt only.`
+const NO_TEXT = ' No text, no letters, no numbers.'
+async function writeArtPrompt(brief) {
+  const model = process.env.MODEL_NAME
+  if (!model || !process.env.MODEL_API_KEY) return brief
+  try {
+    const r = await getClient().responses.create({
+      model,
+      instructions: ART_PROMPT,
+      input: brief,
+      max_output_tokens: 1000,
+      reasoning: { effort: 'low' },
+    })
+    console.log(`[usage] model=${model} step=badge-prompt input_tokens=${r.usage?.input_tokens} output_tokens=${r.usage?.output_tokens}`)
+    const text = r.output_text?.trim().replace(/^"|"$/g, '')
+    if (!text || text.length < 40 || text.length > 900) return brief
+    return text.replace(/\s+/g, ' ') + NO_TEXT
+  } catch (err) {
+    console.warn('[badge] prompt writer failed, using the plain brief:', err.message)
+    return brief
+  }
+}
+
 app.post('/api/badge', async (req, res) => {
   const { badge, context, fresh } = req.body ?? {}
   if (!BADGE_IDS.includes(badge)) return res.status(400).json({ error: 'Unknown badge' })
-  const prompt = badgePrompt(badge, context)
-  if (!fresh && badgeCache.has(prompt)) return res.json({ image: badgeCache.get(prompt) })
+  const brief = badgePrompt(badge, context)
+  if (!fresh && badgeCache.has(brief)) return res.json({ image: badgeCache.get(brief) })
   if (!takeImageSlot()) return res.status(429).json({ error: "That's all the badge art for today. Try again tomorrow." })
   try {
+    const prompt = await writeArtPrompt(brief)
     const image = `data:image/png;base64,${(await generateImage(prompt)).toString('base64')}`
-    badgeCache.set(prompt, image)
+    badgeCache.set(brief, image)
     res.json({ image })
   } catch (err) {
     console.error('[badge]', err.message)
