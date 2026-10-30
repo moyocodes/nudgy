@@ -33,8 +33,11 @@ function TaskEditor({ task, onClose }) {
   const [sureDelete, setSureDelete] = useState(false)
 
   // A date with no time defaults to 9 AM; a time with no date means today.
-  // A repeating task's due is simply its next slot.
-  const due = repeat ? nextOccurrence(repeat) : date || time ? new Date(`${date || dayString(0)}T${time || '09:00'}`) : null
+  // A repeating task's due is its next slot. If the repeat didn't change, keep the slot it's already on:
+  // recomputing from now would bring back a slot that was ticked off early (ticked at 00:30, saved at 8:00 = 9:00 again).
+  const sameRepeat = JSON.stringify(repeat) === JSON.stringify(task.repeat ?? null)
+  const keepDue = sameRepeat && task.due && new Date(task.due) > new Date()
+  const due = repeat ? (keepDue ? new Date(task.due) : nextOccurrence(repeat)) : date || time ? new Date(`${date || dayString(0)}T${time || '09:00'}`) : null
   const asleep = due && priority === 'low' && !canNudge({ priority }, due, schedule)
 
   function save(e) {

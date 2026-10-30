@@ -177,7 +177,10 @@ export function StoreProvider({ children }) {
     const task = tasks.find((t) => t.id === id)
     if (!task || task.done) return
     // Photo proof is optional: without the photo the task still counts, just without the bonus.
-    const next = nextOccurrence(task.repeat)
+    // Ticking counts for the slot it's due at, even before that slot comes round (e.g. ticking today's 9:00 at 00:30),
+    // so the next slot is the one after whichever is later: now or the current due time.
+    const from = new Date(Math.max(Date.now(), task.due ? new Date(task.due).getTime() : 0))
+    const next = nextOccurrence(task.repeat, from)
     if (next) {
       setTasks((ts) => ts.map((t) => (t.id === id ? { ...t, due: next.toISOString(), snoozedUntil: null, lastDoneAt: new Date().toISOString() } : t)))
       setNudges((ps) => ps.filter((p) => p.taskId !== id))
