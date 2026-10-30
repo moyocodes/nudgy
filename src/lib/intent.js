@@ -71,3 +71,14 @@ export function taskSummary(tasks, scope, name = 'friend', now = new Date()) {
 const DIGITAL = /^\s*(?:call|phone|ring|text|email|e-mail|message|dm|whatsapp|pay|transfer|send|reply|respond|remind|remember|think|decide|plan|research|read|review|check|book|renew|order)\b/i
 const PHYSICAL = /\b(?:meeting|stand-?up|conference|workshop|class|lecture|interview|presentation|event|party|wedding|appointment|visit|go to|head to|drive to|walk to|drop (?:off|by)|pick up|collect|buy|shop|clean|wash|tidy|cook|pack|fix|assemble|post|mail|gym|workout|exercise|haircut|dentist|doctor|bank|pharmacy|airport|work|office|school|church|mosque|market|store)\b/i
 export const looksPhysical = (title) => !DIGITAL.test(title) && PHYSICAL.test(title)
+
+// "30 minutes", "half an hour", "1 hour", "2h", "two hours" -> minutes. Null if no length is given.
+// bare: also accept just "30", "1" or "2", for a reply to "how long?".
+export function snoozeMinutes(text, bare = false) {
+  const t = String(text).toLowerCase().trim()
+  const only = (re) => bare && new RegExp(`^(${re})[.!\\s]*$`).test(t)
+  if (/\b(30|thirty)\s*(m|mins?|minutes?)\b|half( an)? hour/.test(t) || only('30|thirty')) return 30
+  if (/\b(2|two)\s*(h|hrs?|hours?)\b/.test(t) || only('2|two')) return 120
+  if (/\b(1|one|an?)\s*(h|hrs?|hours?)\b|\bhour\b/.test(t) || only('1|one')) return 60
+  return null
+}

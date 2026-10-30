@@ -6,7 +6,7 @@ import { badgeStats, mockExtract, nextBadge } from '../lib/mockData.js'
 import { countdown, friendlyDue, isOverdue, nextDue, savedSummary } from '../lib/format.js'
 import { describeRepeat, nextOccurrence } from '../lib/schedule.js'
 import { greetingLine, isGreeting } from '../lib/phrases.js'
-import { BACKSTOP, INTENT_HINT, OFFER, listRequest, looksPhysical, taskSummary, whenAsk } from '../lib/intent.js'
+import { BACKSTOP, INTENT_HINT, OFFER, listRequest, looksPhysical, snoozeMinutes, taskSummary, whenAsk } from '../lib/intent.js'
 import BrainDump from '../components/BrainDump.jsx'
 import SoundPicker from '../components/SoundPicker.jsx'
 import TaskCard from '../components/TaskCard.jsx'
@@ -394,7 +394,7 @@ export default function HomePage() {
   }
 
   // Applies the model's actions on existing reminders and describes what really changed.
-  function applyActions(actions, listed) {
+  function applyActions(actions, listed, text = '') {
     const said = []
     for (const a of actions) {
       const task = listed[a.n - 1]
@@ -404,7 +404,12 @@ export default function HomePage() {
         said.push(`Ticked off "${task.title}".${task.physical ? ' No photo, so no bonus.' : ''}`)
       }
       if (a.type === 'delete') { deleteTask(task.id); said.push(`Binned "${task.title}".`) }
-      if (a.type === 'snooze') { snoozeTask(task.id); said.push(`Snoozed "${task.title}" for an hour.`) }
+      if (a.type === 'snooze') {
+        // Nudgy asks how long, unless the message already said.
+        const minutes = snoozeMinutes(text)
+        if (minutes) { snoozeTask(task.id, minutes); said.push(`Snoozed "${task.title}" for ${snoozeName(minutes)}.`) }
+        else { setPendingSnooze(task.id); said.push(`How long should I snooze "${task.title}"? 30 min, 1 hour or 2 hours?`) }
+      }
       if (a.type === 'update') {
         const changes = {}
         if (a.due) changes.due = new Date(a.due).toISOString()
@@ -440,6 +445,9 @@ export default function HomePage() {
   const [thinking, setThinking] = useState(0)
   // A question with no reminder to hang on ("what did you mean?"), kept above the box until answered.
   const [pendingQuestion, setPendingQuestion] = useState(null)
+  // A snooze waiting on "how long?", answered by the next message with no model call.
+  const [pendingSnooze, setPendingSnooze] = useState(null)
+  const snoozeName = (m) => (m === 30 ? '30 minutes' : m === 60 ? 'an hour' : `${m / 60} hours`)
   async function handleDump(text) {
     setPendingQuestion(null)
     setThinking((n) => n + 1)
@@ -451,6 +459,18 @@ export default function HomePage() {
   }
 
   async function processDump(text) {
+    if (pendingSnooze) {
+      const id = pendingSnooze
+      setPendingSnooze(null)
+      const minutes = snoozeMinutes(text, true)
+      const task = tasks.find((t) => t.id === id && !t.done)
+      if (minutes && task) {
+        snoozeTask(id, minutes)
+        const line = `Snoozed "${task.title}" for ${snoozeName(minutes)}.`
+        say(line)
+        return addChat({ from: 'you', text }, { from: 'nudgy', text: line })
+      }
+    }
     // A bare greeting ("hey Nudgy", "hi Moyo", "good morning") gets a hello back, no model call.
     if (isGreeting(text, [name, buddyName])) {
       const open = tasks.filter((t) => !t.done)
@@ -503,7 +523,7 @@ export default function HomePage() {
         return undoLast()
       }
       const before = tasks
-      const changed = applyActions(actions, listed)
+      const changed = applyActions(actions, listed, text)
       const room = Math.max(0, MAX_OPEN_TASKS - tasks.filter((t) => !t.done).length)
       const saved = found.slice(0, room).map((t, i) => {
         const due = t.due ? new Date(t.due).toISOString() : t.repeat ? nextOccurrence(t.repeat)?.toISOString() ?? null : null
