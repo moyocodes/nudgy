@@ -28,3 +28,6 @@
 - Removed the "overwhelmed" mood and Calm mode (model mood field, folded one-task view, "deep breath" line, onboarding tile, README/DEMO text, practice scenario), so nothing in Nudgy reads like wellbeing advice. Hackathon rules ban AI medical advice.
 - Fixed recurring tasks nudging after being ticked: ticking before the slot came round (e.g. at 00:30 for 9:00) moved the task to that same day's slot, so it was "done today" yet overdue at 9:00. The next slot now comes after the later of now and the current due time.
 - Same bug via the task editor: saving a recurring task recomputed its slot from now, bringing back a slot already ticked off early. It now keeps the current slot when the repeat is unchanged.
+- Accounts move to a SQL database: MySQL (cPanel) when DATABASE_URL is set, the JSON file otherwise. Sessions are now an HTTP-only cookie instead of a token in localStorage, stored hashed. Existing sign-ins need to log in once more.
+- Streak finally counts: the first finish of a day adds one if yesterday had one, else it restarts at 1. It is saved per account. Before, nothing ever raised it.
+- Images in the database: badge art and photo thumbnails upload once to an images table (per account, behind the session cookie) and the synced state keeps a link, so syncing no longer re-sends pictures. Signed-out users keep them in the browser.

@@ -21,10 +21,12 @@ export function deviceName() {
   return `${browser} on ${os}`
 }
 
-async function call(path, { method = 'GET', body, session } = {}) {
+// The session is an HTTP-only cookie set by the server, so the browser sends it on its own.
+async function call(path, { method = 'GET', body } = {}) {
   const r = await fetch(path, {
     method,
-    headers: { 'Content-Type': 'application/json', ...(session ? { Authorization: `Bearer ${session}` } : {}) },
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined,
   })
   const json = await r.json().catch(() => ({}))
@@ -37,6 +39,7 @@ export const submitCode = (pendingId, code) => call('/api/auth/code', { method: 
 // Log in with just the email (no code). Throws with status 404 if there's no such account, 403 if the server wants a code.
 export const directLogin = (email) => call('/api/auth/login', { method: 'POST', body: { email, deviceId: deviceId(), deviceName: deviceName() } })
 export const loginStatus = () => call(`/api/auth/status?deviceId=${encodeURIComponent(deviceId())}`)
-export const logout = (session) => call('/api/auth/logout', { method: 'POST', session })
-export const pullState = (session) => call('/api/sync', { session })
-export const pushState = (session, state) => call('/api/sync', { method: 'PUT', session, body: { state } })
+export const logout = () => call('/api/auth/logout', { method: 'POST' })
+export const pullState = () => call('/api/sync')
+export const pushState = (state) => call('/api/sync', { method: 'PUT', body: { state } })
+export const uploadImage = (key, data) => call(`/api/images/${encodeURIComponent(key)}`, { method: 'PUT', body: { data } })

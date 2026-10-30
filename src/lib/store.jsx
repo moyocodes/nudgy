@@ -1,9 +1,9 @@
 // Prototype state: tasks, nudges, points and streak, kept in localStorage.
 // No model calls here; extraction and nudges are mocked until the real routes exist.
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { DEFAULT_SCHEDULE, nextOccurrence } from './schedule.js'
 import { applyAccent } from './themes.js'
-import { logout, pullState, pushState } from './account.js'
+import { logout, pullState, pushState, uploadImage } from './account.js'
 import { isEarly, isOverdue } from './format.js'
 import { snoozeLine } from './phrases.js'
 import { SNOOZE_OPTIONS } from './nudges.js'
@@ -16,7 +16,7 @@ const StoreContext = createContext(null)
 // v2 drops the old sample tasks and nudges so everyone starts with an empty list.
 try {
   if (localStorage.getItem('nudgy:v') !== '2') {
-    ;['tasks', 'nudges', 'points', 'streak', 'snoozes'].forEach((k) => localStorage.removeItem(`nudgy:${k}`))
+    ;['tasks', 'nudges', 'points', 'streak', 'streakDay', 'snoozes'].forEach((k) => localStorage.removeItem(`nudgy:${k}`))
     localStorage.setItem('nudgy:v', '2')
   }
 } catch {}
@@ -52,6 +52,8 @@ export function StoreProvider({ children }) {
   const [nudges, setNudges] = usePersisted('nudges', [])
   const [points, setPoints] = usePersisted('points', 0)
   const [streak, setStreak] = usePersisted('streak', 0)
+  // The last day (toDateString) something got finished, for the streak. Synced with the account like the streak.
+  const [streakDay, setStreakDay] = usePersisted('streakDay', null)
   const [theme, setTheme] = usePersisted('theme', 'chill')
   const [schedule, setSchedule] = usePersisted('schedule', DEFAULT_SCHEDULE)
   // The welcome intro plays once per visit (tab session), not once ever.
@@ -117,26 +119,26 @@ export function StoreProvider({ children }) {
     applyAccent(theme, accents[theme])
   }, [theme, accents])
 
-  // Signed-in account: { email, session } for this device, or null. See lib/account.js.
+  // Signed-in account: { email } for this device, or null. The session itself is an HTTP-only cookie. See lib/account.js.
   const [account, setAccount] = usePersisted('account', null)
-  const synced = { name, tasks, nudges, points, streak, theme, schedule, snoozes, chat, accents, tutorialSeen, badgeArt, rundownMode, buddyName }
-  const setters = { name: setName, tasks: setTasks, nudges: setNudges, points: setPoints, streak: setStreak, theme: setTheme, schedule: setSchedule, snoozes: setSnoozes, chat: setChat, accents: setAccents, tutorialSeen: setTutorialSeen, badgeArt: setBadgeArt, rundownMode: setRundownMode, buddyName: setBuddyName }
+  const synced = { name, tasks, nudges, points, streak, streakDay, theme, schedule, snoozes, chat, accents, tutorialSeen, badgeArt, rundownMode, buddyName }
+  const setters = { name: setName, tasks: setTasks, nudges: setNudges, points: setPoints, streak: setStreak, streakDay: setStreakDay, theme: setTheme, schedule: setSchedule, snoozes: setSnoozes, chat: setChat, accents: setAccents, tutorialSeen: setTutorialSeen, badgeArt: setBadgeArt, rundownMode: setRundownMode, buddyName: setBuddyName }
   const [hydrated, setHydrated] = useState(false)
 
   // On sign-in: the account's saved state wins if there is one; otherwise this device's state seeds it.
   useEffect(() => {
     if (!account) return setHydrated(false)
     let cancelled = false
-    pullState(account.session)
+    pullState()
       .then((saved) => {
         if (cancelled) return
         if (saved?.state) for (const [k, v] of Object.entries(saved.state)) setters[k]?.(v)
-        else pushState(account.session, synced).catch(() => {})
+        else pushState(withoutInlineImages(synced)).catch(() => {})
         setHydrated(true)
       })
       .catch((err) => { if (err.status === 401) setAccount(null) })
     return () => { cancelled = true }
-  }, [account?.session]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [account?.email]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // A recurring task whose slot was missed on an earlier day isn't "overdue": it skips ahead to its next slot.
   // Today's slot stays put until it's ticked, so the nudges for it still fire.
@@ -154,16 +156,41 @@ export function StoreProvider({ children }) {
     setNudges((ps) => ps.filter((p) => !ids.has(p.taskId)))
   }, [tasks, hydrated, clock]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Pictures go to the account's image store once, and the state keeps a link (/api/images/...) instead.
+  // Runs for new pictures and for ones made before signing in. Signed out, they stay in the browser as they are.
+  const uploading = useRef(new Set())
+  useEffect(() => {
+    if (!account || !hydrated) return
+    const todo = [
+      ...Object.entries(badgeArt).filter(([, v]) => v?.startsWith('data:')).map(([id, v]) => ({ key: `badge-${id}`, data: v, put: (url) => setBadgeArt((all) => (all[id] === v ? { ...all, [id]: url } : all)) })),
+      ...tasks.filter((t) => t.photo?.startsWith('data:')).map((t) => ({ key: `photo-${t.id}`, data: t.photo, put: (url) => setTasks((ts) => ts.map((x) => (x.id === t.id && x.photo === t.photo ? { ...x, photo: url } : x))) })),
+    ].filter((i) => !uploading.current.has(i.key))
+    for (const i of todo) {
+      uploading.current.add(i.key)
+      uploadImage(i.key, i.data)
+        .then(({ url }) => i.put(url))
+        .catch((err) => console.warn('[images] upload failed, kept on this device:', err.message))
+        .finally(() => uploading.current.delete(i.key))
+    }
+  }, [account?.email, hydrated, badgeArt, tasks]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Pictures not uploaded yet stay out of the sync, so it never carries the image itself.
+  const withoutInlineImages = (state) => ({
+    ...state,
+    badgeArt: Object.fromEntries(Object.entries(state.badgeArt).filter(([, v]) => !v?.startsWith('data:'))),
+    tasks: state.tasks.map((t) => (t.photo?.startsWith('data:') ? { ...t, photo: undefined } : t)),
+  })
+
   // After that, every change is saved to the account a moment later.
   const syncKey = JSON.stringify(synced)
   useEffect(() => {
     if (!account || !hydrated) return
-    const id = setTimeout(() => pushState(account.session, synced).catch((err) => { if (err.status === 401) setAccount(null) }), 1500)
+    const id = setTimeout(() => pushState(withoutInlineImages(synced)).catch((err) => { if (err.status === 401) setAccount(null) }), 1500)
     return () => clearTimeout(id)
   }, [syncKey, hydrated]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function signOut() {
-    try { await logout(account.session) } catch {}
+    try { await logout() } catch {}
     setAccount(null)
   }
 
@@ -193,6 +220,13 @@ export function StoreProvider({ children }) {
     const others = tasks.filter((t) => !t.done && t.id !== id).length
     const context = others === 0 ? 'allClear' : proof ? 'proof' : task.repeat ? 'recurring' : isOverdue(task) ? 'late' : isEarly(task) ? 'early' : 'plain'
     setCelebration({ task: task.title, earned, key: Date.now(), context })
+    // Streak: the first finish of a day adds one if yesterday had one too, otherwise it starts again at 1.
+    const today = new Date().toDateString()
+    if (streakDay !== today) {
+      const yesterday = new Date(Date.now() - 86400000).toDateString()
+      setStreak((n) => (streakDay === yesterday ? n + 1 : 1))
+      setStreakDay(today)
+    }
   }
 
   // A new time makes the old nudges about the old time stale, so they go.
@@ -233,6 +267,7 @@ export function StoreProvider({ children }) {
     setNudges([])
     setPoints(0)
     setStreak(0)
+    setStreakDay(null)
   }
 
   return (

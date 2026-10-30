@@ -22,8 +22,8 @@ export default function AccountCard({ variant = 'sync' }) {
     const id = setInterval(async () => {
       try {
         const s = await loginStatus()
-        if (s.session) {
-          setAccount({ email: s.email, session: s.session })
+        if (s.email) {
+          setAccount({ email: s.email })
           setPendingId(null)
         }
       } catch {}
@@ -40,7 +40,7 @@ export default function AccountCard({ variant = 'sync' }) {
       if (variant === 'login') {
         try {
           const s = await directLogin(email.trim())
-          setAccount({ email: s.email, session: s.session })
+          setAccount({ email: s.email })
           return setBusy(false)
         } catch (err) {
           // The server may be set to ask for a code on login too; otherwise the error is real.
@@ -62,7 +62,7 @@ export default function AccountCard({ variant = 'sync' }) {
     setBusy(true)
     try {
       const s = await submitCode(pendingId, code)
-      setAccount({ email: s.email, session: s.session })
+      setAccount({ email: s.email })
       setPendingId(null)
     } catch (err) {
       setError(err.message)
