@@ -176,7 +176,7 @@ export default function BrainDump({ onSubmit, reminders = [], about, onPickAbout
           about
             ? 'What should I do with it? "7pm", "every Monday", "high priority", "done"…'
             : question ? 'Answer Nudgy, or add something new…'
-            : expanded ? "Call the dentist, buy oat milk… or just tell me you're swamped." : 'Add something, or brain-dump it all…'
+            : expanded ? "Call the dentist, buy oat milk, Yinka's tomorrow at 5…" : 'Add something, or brain-dump it all…'
         }
         className={`w-full resize-none bg-transparent p-2 leading-relaxed outline-none placeholder:text-ink/35 ${full ? 'flex-1 text-lg' : 'pr-9 text-base'}`}
       />
