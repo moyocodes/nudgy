@@ -31,3 +31,4 @@
 - Accounts move to a SQL database: MySQL (cPanel) when DATABASE_URL is set, the JSON file otherwise. Sessions are now an HTTP-only cookie instead of a token in localStorage, stored hashed. Existing sign-ins need to log in once more.
 - Streak finally counts: the first finish of a day adds one if yesterday had one, else it restarts at 1. It is saved per account. Before, nothing ever raised it.
 - Images in the database: badge art and photo thumbnails upload once to an images table (per account, behind the session cookie) and the synced state keeps a link, so syncing no longer re-sends pictures. Signed-out users keep them in the browser.
+- Postgres support: DATABASE_URL starting postgres:// uses Postgres (e.g. Neon), mysql:// still uses MySQL. Namecheap shared hosting has no remote MySQL access, so Render could not reach it and crashed on start. Images are stored as base64 text in Postgres.

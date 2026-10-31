@@ -1,6 +1,6 @@
 # Render free web service: Express serves the built app and the /api routes.
 # Free instances sleep after ~15 min idle and have no persistent disk, so set
-# DATABASE_URL (MySQL, e.g. on cPanel) to keep accounts and synced data. Without it,
+# DATABASE_URL (Postgres, e.g. Neon, or MySQL) to keep accounts and synced data. Without it,
 # server/data is wiped on restart/redeploy.
 services:
   - type: web

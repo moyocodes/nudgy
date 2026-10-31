@@ -36,8 +36,8 @@ Model output is never trusted blindly. The server drops tasks with no title, tur
 - **Frontend:** React 19, Vite, Tailwind CSS v4, Framer Motion and GSAP for motion.
 - **Backend:** Express, with the OpenAI SDK pointed at the Meta Model API (`https://api.meta.ai/v1`), and a WebSocket relay for live transcription.
 - **The API key stays on the server.** Vite proxies `/api` to Express, so the browser never sees it.
-- **Accounts:** passwordless, per-device confirmation by email (Resend). The session is an HTTP-only cookie, stored hashed. Data lives in MySQL when `DATABASE_URL` is set (users, devices, synced state, images), or a git-ignored JSON file locally.
-- **Hosting:** Render (`render.yaml`), with the MySQL database on Namecheap and the domain getnudgy.chat.
+- **Accounts:** passwordless, per-device confirmation by email (Resend). The session is an HTTP-only cookie, stored hashed. Data lives in Postgres or MySQL when `DATABASE_URL` is set (users, devices, synced state, images), or a git-ignored JSON file locally.
+- **Hosting:** Render (`render.yaml`), with the Postgres database on Neon and the domain getnudged.chat.
 
 ## Setup
 
@@ -48,7 +48,7 @@ Model output is never trusted blindly. The server drops tasks with no title, tur
    - `VOICE_MODEL_NAME`: defaults to `muse-voice-transcribe-1.0`
    - `SAM_MODEL_NAME` and `IMAGE_MODEL_NAME`: for photo proof and badge art
    - `NUDGE_ENGINE=open` plus `OPEN_BASE_URL`, `OPEN_API_KEY`, `OPEN_MODEL` (optional): nudges from Muse Spark Open
-   - `DATABASE_URL` (optional): MySQL, `mysql://USER:PASSWORD@HOST:3306/DBNAME`. Without it, data goes in `server/data/db.json`.
+   - `DATABASE_URL` (optional): Postgres (`postgresql://…`) or MySQL (`mysql://…`). Without it, data goes in `server/data/db.json`.
    - `RESEND_API_KEY` (optional): sends real confirmation emails. Without it, the link and code are printed in the server terminal (and the demo code is 123456).
 3. `npm run dev` starts Express (port 3001) and Vite (port 5173).
 4. Open http://localhost:5173.
@@ -58,7 +58,7 @@ Model output is never trusted blindly. The server drops tasks with no title, tur
 ```
 server/index.js           Model routes: /api/extract, /api/nudge; voice relay /api/asr
 server/auth.js            Email device login, session cookie, sync and images
-server/db.js              Storage: MySQL or the JSON file
+server/db.js              Storage: Postgres, MySQL or the JSON file
 src/pages/                Landing, Today, Nudges, Rewards, Me, chat history, photo proof, login
 src/components/           Brain dump, task card, nudge scheduler, repeat picker, mascot, story…
 src/lib/                  Store, schedule and repeat maths, nudges, themes, account calls
